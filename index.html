@@ -13,6 +13,8 @@
         rel="stylesheet">
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Public Runtime Configuration for Clean Browser & Mobile Initialization -->
+    <script src="config.js"></script>
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- SheetJS for Excel XLSX Export -->
@@ -4882,37 +4884,120 @@
                 document.getElementById('current-arabic-date').innerText = now.toLocaleDateString('ar-EG', options);
             },
 
-            async checkSavedCloudConfig() {
-                let savedUrl = localStorage.getItem('alamira_supabase_url');
-                // Auto-migrate legacy typo URL if present in user's browser localStorage without touching other settings
-                if (savedUrl === LEGACY_TYPO_SUPABASE_URL || (savedUrl && savedUrl.includes('llmptlkvatndvrmnijyj'))) {
-                    savedUrl = DEFAULT_SUPABASE_URL;
-                    localStorage.setItem('alamira_supabase_url', DEFAULT_SUPABASE_URL);
-                } else if (!savedUrl) {
-                    savedUrl = DEFAULT_SUPABASE_URL;
+            resolveCloudConfig() {
+                const runtimeConfig = (typeof window !== 'undefined' && window.__ALAMIRA_CONFIG__) ? window.__ALAMIRA_CONFIG__ : {};
+                
+                // Authoritative production deployment configuration from config.js or dynamic Vercel config
+                const deployUrl = (runtimeConfig.SUPABASE_URL || DEFAULT_SUPABASE_URL || '').trim();
+                const deployKey = (runtimeConfig.SUPABASE_ANON_KEY || DEFAULT_SUPABASE_KEY || '').trim();
+
+                let savedUrl = (localStorage.getItem('alamira_supabase_url') || '').trim();
+                let savedKey = (localStorage.getItem('alamira_supabase_key') || '').trim();
+
+                // Production deployment configuration takes precedence over stale, legacy, or missing localStorage values
+                if (deployUrl && deployKey) {
+                    const isLegacyTypo = savedUrl === LEGACY_TYPO_SUPABASE_URL || savedUrl.includes('llmptlkvatndvrmnijyj');
+                    const isStale = isLegacyTypo || !savedUrl || !savedKey || (savedUrl !== deployUrl && !localStorage.getItem('alamira_custom_override'));
+
+                    if (isStale) {
+                        localStorage.setItem('alamira_supabase_url', deployUrl);
+                        localStorage.setItem('alamira_supabase_key', deployKey);
+                        localStorage.removeItem('alamira_custom_override');
+                        return { url: deployUrl, key: deployKey };
+                    }
+
+                    return { url: savedUrl, key: savedKey };
                 }
 
-                const savedKey = localStorage.getItem('alamira_supabase_key') || DEFAULT_SUPABASE_KEY;
+                return {
+                    url: savedUrl || DEFAULT_SUPABASE_URL,
+                    key: savedKey || DEFAULT_SUPABASE_KEY
+                };
+            },
+
+            async ensureSupabaseSDK(timeoutMs = 4000) {
+                if (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+                    return true;
+                }
+
+                const startTime = Date.now();
+                let fallbackTriggered = false;
+
+                while (Date.now() - startTime < timeoutMs) {
+                    if (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+                        return true;
+                    }
+
+                    // If still missing after 1.5 seconds, inject secondary CDN
+                    if (!fallbackTriggered && (Date.now() - startTime > 1500)) {
+                        fallbackTriggered = true;
+                        try {
+                            const fallbackScript = document.createElement('script');
+                            fallbackScript.src = 'https://unpkg.com/@supabase/supabase-js@2';
+                            fallbackScript.async = true;
+                            document.head.appendChild(fallbackScript);
+                        } catch (e) {
+                            console.warn('Fallback CDN injection failed:', e);
+                        }
+                    }
+
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+
+                return !!(typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function');
+            },
+
+            async syncVercelEnvConfig() {
+                try {
+                    if (typeof window === 'undefined' || typeof fetch !== 'function') return;
+                    const res = await fetch('/api/config', { method: 'GET', cache: 'no-cache' });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.supabaseUrl && data.supabaseAnonKey) {
+                            if (!window.__ALAMIRA_CONFIG__) window.__ALAMIRA_CONFIG__ = {};
+                            window.__ALAMIRA_CONFIG__.SUPABASE_URL = data.supabaseUrl;
+                            window.__ALAMIRA_CONFIG__.SUPABASE_ANON_KEY = data.supabaseAnonKey;
+                        }
+                    }
+                } catch (e) {
+                    // Non-blocking background sync failure ignored
+                }
+            },
+
+            async checkSavedCloudConfig() {
+                const sdkReady = await this.ensureSupabaseSDK();
+
                 const connPill = document.getElementById('connection-pill');
                 const connText = document.getElementById('connection-status-text');
                 const authMode = document.getElementById('auth-mode-indicator');
                 const offlineBanner = document.getElementById('offline-warning-banner');
 
-                if (savedUrl && savedKey && window.supabase) {
+                if (!sdkReady || !window.supabase) {
+                    this.setDisconnectedState('تعذر تحميل مكتبة الاتصال بالسحابة. يرجى التحقق من اتصال الإنترنت.');
+                    return false;
+                }
+
+                const { url, key } = this.resolveCloudConfig();
+
+                if (url && key) {
                     try {
-                        AppState.supabaseClient = window.supabase.createClient(savedUrl, savedKey);
+                        AppState.supabaseClient = window.supabase.createClient(url, key);
                         AppState.isCloud = true;
-                        connPill.className = 'status-pill online';
-                        connText.innerText = 'متصل بـ Supabase';
-                        authMode.innerHTML = '<i class="fa-solid fa-cloud"></i> متصل بالسحابة (Al-Amira)';
+                        if (connPill) connPill.className = 'status-pill online';
+                        if (connText) connText.innerText = 'متصل بـ Supabase';
+                        if (authMode) authMode.innerHTML = '<i class="fa-solid fa-cloud"></i> متصل بالسحابة (Al-Amira)';
                         if (offlineBanner) offlineBanner.style.display = 'none';
+
+                        // Background sync check for Vercel dynamic env
+                        this.syncVercelEnvConfig();
+
                         return true;
                     } catch (e) {
                         this.setDisconnectedState('خطأ في تهيئة عميل Supabase: ' + e.message);
                         return false;
                     }
                 } else {
-                    this.setDisconnectedState('لم يتم إدخال إعدادات الربط السحابي (URL و Publishable Key)');
+                    this.setDisconnectedState('لم يتم العثور على إعدادات مشروع Supabase');
                     return false;
                 }
             },
@@ -4982,15 +5067,22 @@
                 e.preventDefault();
                 const email = document.getElementById('login-email').value.trim();
                 const pwd = document.getElementById('login-password').value;
+                const btnSubmit = document.getElementById('btn-login-submit');
 
+                btnSubmit.disabled = true;
+                btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري الاتصال بالسحابة...';
+
+                // If not connected yet (e.g. initial load on fresh device or slow mobile CDN), attempt auto-connection
                 if (!AppState.isCloud || !AppState.supabaseClient) {
-                    showToast('تعذر تسجيل الدخول: التطبيق غير متصل بقاعدة بيانات Supabase. يرجى إدخال Project URL و Anon Public Key عبر زر إعدادات الربط السحابي بالأسفل.', 'error');
-                    App.openConfigModal();
-                    return;
+                    const connected = await this.checkSavedCloudConfig();
+                    if (!connected || !AppState.supabaseClient) {
+                        btnSubmit.disabled = false;
+                        btnSubmit.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> تسجيل الدخول';
+                        showToast('تعذر الاتصال بخادم Supabase السحابي. يرجى التأكد من اتصال الإنترنت ثم إعادة المحاولة.', 'error');
+                        return;
+                    }
                 }
 
-                const btnSubmit = document.getElementById('btn-login-submit');
-                btnSubmit.disabled = true;
                 btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري التحقق من الخادم السحابي...';
 
                 try {
@@ -5039,7 +5131,7 @@
                     showToast(msg, 'error');
                 } finally {
                     btnSubmit.disabled = false;
-                    btnSubmit.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> تسجيل الدخول للنظام';
+                    btnSubmit.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> تسجيل الدخول';
                 }
             },
 
@@ -5200,21 +5292,21 @@
             },
 
             openConfigModal() {
-                let savedUrl = localStorage.getItem('alamira_supabase_url');
-                if (savedUrl === LEGACY_TYPO_SUPABASE_URL || (savedUrl && savedUrl.includes('llmptlkvatndvrmnijyj'))) {
-                    savedUrl = DEFAULT_SUPABASE_URL;
-                    localStorage.setItem('alamira_supabase_url', DEFAULT_SUPABASE_URL);
-                }
-                document.getElementById('config-supabase-url').value = savedUrl || DEFAULT_SUPABASE_URL;
-                document.getElementById('config-supabase-key').value = localStorage.getItem('alamira_supabase_key') || DEFAULT_SUPABASE_KEY;
+                const config = this.resolveCloudConfig ? this.resolveCloudConfig() : { url: DEFAULT_SUPABASE_URL, key: DEFAULT_SUPABASE_KEY };
+                document.getElementById('config-supabase-url').value = config.url;
+                document.getElementById('config-supabase-key').value = config.key;
                 document.getElementById('modal-config').classList.add('active');
             },
 
             resetToDefaultConfig() {
-                document.getElementById('config-supabase-url').value = DEFAULT_SUPABASE_URL;
-                document.getElementById('config-supabase-key').value = DEFAULT_SUPABASE_KEY;
-                localStorage.setItem('alamira_supabase_url', DEFAULT_SUPABASE_URL);
-                localStorage.setItem('alamira_supabase_key', DEFAULT_SUPABASE_KEY);
+                const config = (typeof window !== 'undefined' && window.__ALAMIRA_CONFIG__ && window.__ALAMIRA_CONFIG__.SUPABASE_URL) ? 
+                    { url: window.__ALAMIRA_CONFIG__.SUPABASE_URL, key: window.__ALAMIRA_CONFIG__.SUPABASE_ANON_KEY } : 
+                    { url: DEFAULT_SUPABASE_URL, key: DEFAULT_SUPABASE_KEY };
+                document.getElementById('config-supabase-url').value = config.url;
+                document.getElementById('config-supabase-key').value = config.key;
+                localStorage.setItem('alamira_supabase_url', config.url);
+                localStorage.setItem('alamira_supabase_key', config.key);
+                localStorage.removeItem('alamira_custom_override');
                 this.checkSavedCloudConfig();
                 showToast('تمت استعادة إعدادات مشروع Supabase الافتراضية بنجاح', 'success');
             },
@@ -5227,6 +5319,7 @@
                 if (url && key) {
                     localStorage.setItem('alamira_supabase_url', url);
                     localStorage.setItem('alamira_supabase_key', key);
+                    localStorage.setItem('alamira_custom_override', 'true');
                     const connected = await this.checkSavedCloudConfig();
                     if (connected) {
                         showToast('تم حفظ الإعدادات وربط السحابة بنجاح', 'success');
@@ -5240,6 +5333,7 @@
                 } else {
                     localStorage.removeItem('alamira_supabase_url');
                     localStorage.removeItem('alamira_supabase_key');
+                    localStorage.removeItem('alamira_custom_override');
                     this.setDisconnectedState('تم مسح إعدادات الربط السحابي');
                     this.closeModals();
                     showToast('تم مسح إعدادات السحابة. لا يمكن إجراء معاملات في هذا الوضع.', 'warning');
