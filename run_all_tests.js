@@ -16,7 +16,10 @@ const tests = [
   'test_ui_redesign.js',
   'test_real_postgresql_integration.js',
   'test_audit_critical_remediation.js',
-  'test_pglite_migrations_validation.js'
+  'test_pglite_migrations_validation.js',
+  'test_invoice_redesign_and_png.js',
+  'test_ui_cleanup_header_and_icons.js',
+  'test_sales_invoices_actions_and_header_removal.js'
 ];
 
 let allPassed = true;

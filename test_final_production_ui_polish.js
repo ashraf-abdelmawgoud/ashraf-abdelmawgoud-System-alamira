@@ -35,13 +35,12 @@ assert(!hasRedundantNewProduct, 'تمت إزالة زر "+ صنف جديد" ال
 assert(!hasRedundantNewReceipt, 'تمت إزالة زر "+ إذن إضافة" المكرر من الترويسة العلوية');
 assert(!hasRedundantSlidersBtn, 'تمت إزالة زر إعدادات السلايدر المكرر لتوفير المساحة وتوحيد الوصول عبر الشريط الجانبي');
 
-// B. Single globally important primary action in topbar
-assert(topbarHTML.includes('topbar-primary-action') && topbarHTML.includes('فاتورة مبيعات'), 'وجود زر واحد فقط للإجراء الرئيسي العالمي (+ فاتورة مبيعات)');
+// B. Sales invoice button completely removed from topbar
+assert(!topbarHTML.includes('topbar-primary-action') && !topbarHTML.includes('فاتورة مبيعات'), 'تمت إزالة زر فاتورة مبيعات من الترويسة العلوية بالكامل لصفاء وتوازن الواجهة');
 
-// C. Compact Backup Freshness Alert
-assert(topbarHTML.includes('id="topbar-backup-alert"'), 'شارة التحذير للنسخ الاحتياطي معرفة بالمعرف id="topbar-backup-alert"');
-assert(topbarHTML.includes('نسخة احتياطية مطلوبة'), 'نص التحذير الطويل تم اختصاره إلى شارة مقتضبة "نسخة احتياطية مطلوبة"');
-assert(topbarHTML.includes('title=') && topbarHTML.includes('24 ساعة'), 'التفسير التفصيلي لمعيار الـ 24 ساعة متاح كتلميح (Tooltip) دون تشويه الواجهة');
+// C. Backup warning completely removed from topbar
+assert(!topbarHTML.includes('topbar-backup-alert'), 'تمت إزالة شارة تحذير النسخ الاحتياطي من الترويسة العلوية بالكامل');
+assert(!topbarHTML.includes('نسخة احتياطية مطلوبة'), 'تمت إزالة نص تحذير النسخ الاحتياطي من الترويسة العلوية');
 
 // D. Compact Supabase Connection & Date
 assert(topbarHTML.includes('id="connection-pill"'), 'حبة حالة الاتصال السحابي (connection-pill) موجودة ومتاحة للنقر');
