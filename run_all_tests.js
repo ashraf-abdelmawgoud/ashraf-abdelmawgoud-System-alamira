@@ -20,7 +20,8 @@ const tests = [
   'test_invoice_redesign_and_png.js',
   'test_ui_cleanup_header_and_icons.js',
   'test_sales_invoices_actions_and_header_removal.js',
-  'test_clean_device_supabase_init.js'
+  'test_clean_device_supabase_init.js',
+  'test_mobile_ux_regression.js'
 ];
 
 let allPassed = true;
