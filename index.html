@@ -8819,129 +8819,13 @@
             },
 
             openReturnModal(invoiceId) {
-                const inv = (AppState.invoices || []).find(i => i.id === invoiceId);
-                if (!inv) {
-                    showToast('لم يتم العثور على بيانات الفاتورة المحددة', 'error');
-                    return;
-                }
-                if (inv.status !== 'approved') {
-                    showToast('تسجيل المرتجع متاح فقط لفواتير المبيعات المعتمدة', 'warning');
-                    return;
-                }
-
-                const cust = (AppState.customers || []).find(c => c.id === inv.customer_id);
-                const custName = cust ? cust.name : (inv.customer_name_snapshot || 'عميل نقدي');
-
-                document.getElementById('return-inv-id').value = inv.id;
-                document.getElementById('return-inv-num').innerText = inv.invoice_number;
-                document.getElementById('return-inv-customer').innerText = custName;
-                document.getElementById('return-inv-date').innerText = inv.invoice_date;
-                document.getElementById('return-inv-reason').value = '';
-                document.getElementById('return-inv-notes').value = '';
-
-                const tbody = document.getElementById('return-inv-items-tbody');
-                const items = inv.items || [];
-
-                if (items.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 16px;">لا توجد أصناف قابلة للإرجاع في هذه الفاتورة</td></tr>';
-                } else {
-                    tbody.innerHTML = items.map((it, idx) => {
-                        const prod = (AppState.products || []).find(p => p.id === it.product_id);
-                        const sku = it.product_sku_snapshot || (prod ? prod.sku : '--');
-                        const name = it.product_name_snapshot || (prod ? prod.name : 'صنف');
-                        const unit = it.unit_snapshot || (prod ? prod.unit : 'وحدة');
-                        const allowsDec = prod ? prod.allows_decimal_quantity : false;
-                        const step = allowsDec ? '0.001' : '1';
-
-                        return '<tr>' +
-                            '<td>' +
-                            '<div style="font-weight: 700; color: var(--navy-dark); font-size: 13px;">' + name + '</div>' +
-                            '<small style="color: var(--text-muted); font-size: 11px;">' + sku + ' (' + unit + ')</small>' +
-                            '</td>' +
-                            '<td style="text-align: center; font-weight: 700;">' + formatQty(it.quantity) + '</td>' +
-                            '<td style="text-align: center;">' + round2(it.unit_price).toFixed(2) + ' ج.م</td>' +
-                            '<td style="text-align: center;">' +
-                            '<input type="number" class="form-control return-item-qty" ' +
-                            'data-item-id="' + it.id + '" ' +
-                            'data-product-id="' + it.product_id + '" ' +
-                            'data-max="' + it.quantity + '" ' +
-                            'min="0" max="' + it.quantity + '" step="' + step + '" value="0" ' +
-                            'style="text-align: center; height: 32px; font-weight: 700; width: 95px; margin: 0 auto;">' +
-                            '</td>' +
-                            '</tr>';
-                    }).join('');
-                }
-
-                document.getElementById('modal-invoice-return').classList.add('active');
+                showToast('ميزة مرتجعات المبيعات قيد التطوير، وستتوفر قريبًا.', 'info');
             },
 
             async executeReturn(e) {
-                e.preventDefault();
-                if (!App.requireCloud()) return;
-
-                const invId = document.getElementById('return-inv-id').value;
-                const reason = document.getElementById('return-inv-reason').value.trim();
-                const notes = document.getElementById('return-inv-notes').value.trim();
-                const inv = (AppState.invoices || []).find(i => i.id === invId);
-
-                if (!inv) return;
-                if (!reason) {
-                    showToast('يرجى كتابة سبب المرتجع الإلزامي', 'warning');
-                    document.getElementById('return-inv-reason').focus();
-                    return;
-                }
-
-                const qtyInputs = document.querySelectorAll('#return-inv-items-tbody .return-item-qty');
-                let totalReturnQty = 0;
-                const returnItems = [];
-
-                for (const input of qtyInputs) {
-                    const qty = Number(input.value) || 0;
-                    const maxQty = Number(input.dataset.max) || 0;
-                    const prodId = input.dataset.productId;
-
-                    if (qty < 0) {
-                        showToast('الكمية المرتجعة لا يمكن أن تكون سالبة', 'warning');
-                        input.focus();
-                        return;
-                    }
-                    if (qty > maxQty) {
-                        showToast('الكمية المرتجعة (' + qty + ') تتجاوز الكمية المباعة الأصلية (' + maxQty + ')', 'warning');
-                        input.focus();
-                        return;
-                    }
-                    if (qty > 0) {
-                        totalReturnQty += qty;
-                        returnItems.push({
-                            product_id: prodId,
-                            quantity: qty,
-                            item_id: input.dataset.itemId
-                        });
-                    }
-                }
-
-                if (totalReturnQty <= 0) {
-                    showToast('يرجى تحديد كمية مرتجعة أكبر من الصفر لصنف واحد على الأقل', 'warning');
-                    return;
-                }
-
-                const btn = document.getElementById('btn-submit-return');
-                if (btn) {
-                    btn.disabled = true;
-                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري حفظ المرتجع...';
-                }
-
-                try {
-                    App.closeModals();
-                    showToast('تم إثبات طلب مرتجع المبيعات للفاتورة (' + inv.invoice_number + ') بنجاح بواقع (' + formatQty(totalReturnQty) + ') وحدة', 'success');
-                } catch (err) {
-                    showToast('فشل تسجيل المرتجع: ' + (err.message || err), 'error');
-                } finally {
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> تأكيد وإثبات المرتجع';
-                    }
-                }
+                if (e) e.preventDefault();
+                showToast('ميزة مرتجعات المبيعات قيد التطوير، وستتوفر قريبًا.', 'info');
+                return false;
             }
         };
 
