@@ -5521,60 +5521,144 @@
                 await this.fetchCloudData();
             },
 
-            async fetchCloudData() {
+            _inFlightPromises: {},
+            _fetchCloudPromise: null,
+
+            resetState() {
+                AppState.categories = [];
+                AppState.products = [];
+                AppState.customers = [];
+                AppState.suppliers = [];
+                AppState.receipts = [];
+                AppState.issues = [];
+                AppState.invoices = [];
+                AppState.adjustments = [];
+                AppState.movements = [];
+                AppState.settings = {};
+                AppState.lastBackupTime = null;
+                this.renderAll();
+            },
+
+            async fetchEntities(entityNames) {
+                if (!AppState.isCloud || !AppState.supabaseClient) return;
+                const client = AppState.supabaseClient;
+
+                const fetchers = {
+                    categories: () => client.from('categories').select('*').order('name'),
+                    products: () => client.from('products').select('*').order('created_at', { ascending: false }),
+                    customers: () => client.from('customers').select('*').order('name'),
+                    suppliers: () => client.from('suppliers').select('*').order('name'),
+                    receipts: () => client.from('stock_receipts').select('*, items:stock_receipt_items(*)').order('created_at', { ascending: false }),
+                    issues: () => client.from('stock_issues').select('*, items:stock_issue_items(*)').order('created_at', { ascending: false }),
+                    invoices: () => client.from('sales_invoices').select('*, items:sales_invoice_items(*)').order('created_at', { ascending: false }),
+                    adjustments: () => client.from('inventory_adjustments').select('*, items:inventory_adjustment_items(*)').order('created_at', { ascending: false }),
+                    movements: () => client.from('inventory_movements').select('*').order('created_at', { ascending: false }).limit(200),
+                    backup: () => client.from('backup_metadata').select('*').order('created_at', { ascending: false }).limit(1),
+                    settings: () => client.from('application_settings').select('*')
+                };
+
+                const appliers = {
+                    categories: (data) => { AppState.categories = data || []; },
+                    products: (data) => { AppState.products = data || []; },
+                    customers: (data) => { AppState.customers = data || []; },
+                    suppliers: (data) => { AppState.suppliers = data || []; },
+                    receipts: (data) => { AppState.receipts = data || []; },
+                    issues: (data) => { AppState.issues = data || []; },
+                    invoices: (data) => { AppState.invoices = data || []; },
+                    adjustments: (data) => { AppState.adjustments = data || []; },
+                    movements: (data) => { AppState.movements = data || []; },
+                    backup: (data) => { if (data && data.length > 0) AppState.lastBackupTime = data[0].created_at; },
+                    settings: (data) => {
+                        AppState.settings = {};
+                        if (data) {
+                            data.forEach(s => { AppState.settings[s.key] = s.value; });
+                        }
+                    }
+                };
+
+                const uniqueEntities = [...new Set(entityNames)].filter(name => fetchers[name]);
+                if (uniqueEntities.length === 0) return;
+
+                const queryPromises = uniqueEntities.map(name => {
+                    if (!this._inFlightPromises[name]) {
+                        this._inFlightPromises[name] = fetchers[name]()
+                            .then(res => {
+                                delete this._inFlightPromises[name];
+                                return { name, res };
+                            })
+                            .catch(err => {
+                                delete this._inFlightPromises[name];
+                                throw err;
+                            });
+                    }
+                    return this._inFlightPromises[name];
+                });
+
+                const results = await Promise.all(queryPromises);
+                results.forEach(({ name, res }) => {
+                    if (res && res.error) {
+                        console.warn('Error fetching ' + name + ' from Supabase:', res.error);
+                    } else if (res && res.data) {
+                        appliers[name](res.data);
+                    }
+                });
+            },
+
+            renderEntities(entityNames) {
+                const set = new Set(entityNames);
+                const has = (key) => set.has(key);
+
+                if (has('products')) ProductsModule.renderTable();
+                if (has('customers')) CustomersModule.renderTable();
+                if (has('suppliers')) SuppliersModule.renderTable();
+                if (has('receipts')) ReceiptsModule.renderTable();
+                if (has('issues')) IssuesModule.renderTable();
+                if (has('invoices')) InvoicesModule.renderTable();
+                if (has('adjustments')) AdjustmentsModule.renderTable();
+                if (has('movements')) MovementsModule.renderTable();
+                if (has('backup')) {
+                    BackupRestoreModule.renderStatus();
+                    this.checkBackupWarning();
+                }
+                if (has('settings')) {
+                    SettingsSection.syncAccountInfo();
+                    SettingsSection.syncConnectionInfo();
+                    SettingsSection.loadCompanyProfile();
+                }
+                if (has('products') || has('invoices') || has('receipts') || has('issues') || has('movements')) {
+                    DashboardModule.render();
+                }
+            },
+
+            async refreshEntities(entityNames) {
+                try {
+                    await this.fetchEntities(entityNames);
+                    this.renderEntities(entityNames);
+                } catch (err) {
+                    showToast('خطأ أثناء مزامنة البيانات من Supabase: ' + (err.message || err), 'error');
+                }
+            },
+
+            async fetchCloudData(force = false) {
                 if (!AppState.isCloud || !AppState.supabaseClient) return;
 
-                try {
-                    const client = AppState.supabaseClient;
-
-                    // Fetch all core datasets from Supabase
-                    const [
-                        { data: cats },
-                        { data: prods },
-                        { data: custs },
-                        { data: sups },
-                        { data: recs },
-                        { data: iss },
-                        { data: invs },
-                        { data: adjs },
-                        { data: movs },
-                        { data: bk },
-                        { data: setts }
-                    ] = await Promise.all([
-                        client.from('categories').select('*').order('name'),
-                        client.from('products').select('*').order('created_at', { ascending: false }),
-                        client.from('customers').select('*').order('name'),
-                        client.from('suppliers').select('*').order('name'),
-                        client.from('stock_receipts').select('*, items:stock_receipt_items(*)').order('created_at', { ascending: false }),
-                        client.from('stock_issues').select('*, items:stock_issue_items(*)').order('created_at', { ascending: false }),
-                        client.from('sales_invoices').select('*, items:sales_invoice_items(*)').order('created_at', { ascending: false }),
-                        client.from('inventory_adjustments').select('*, items:inventory_adjustment_items(*)').order('created_at', { ascending: false }),
-                        client.from('inventory_movements').select('*').order('created_at', { ascending: false }).limit(200),
-                        client.from('backup_metadata').select('*').order('created_at', { ascending: false }).limit(1),
-                        client.from('application_settings').select('*')
-                    ]);
-
-                    AppState.categories = cats || [];
-                    AppState.products = prods || [];
-                    AppState.customers = custs || [];
-                    AppState.suppliers = sups || [];
-                    AppState.receipts = recs || [];
-                    AppState.issues = iss || [];
-                    AppState.invoices = invs || [];
-                    AppState.adjustments = adjs || [];
-                    AppState.movements = movs || [];
-                    if (bk && bk.length > 0) AppState.lastBackupTime = bk[0].created_at;
-                    AppState.settings = {};
-                    if (setts) {
-                        setts.forEach(s => {
-                            AppState.settings[s.key] = s.value;
-                        });
-                    }
-
-                    this.renderAll();
-                } catch (err) {
-                    showToast('خطأ أثناء تحميل البيانات من Supabase: ' + (err.message || err), 'error');
+                if (this._fetchCloudPromise && !force) {
+                    return this._fetchCloudPromise;
                 }
+
+                this._fetchCloudPromise = (async () => {
+                    try {
+                        const allEntities = ['categories', 'products', 'customers', 'suppliers', 'receipts', 'issues', 'invoices', 'adjustments', 'movements', 'backup', 'settings'];
+                        await this.fetchEntities(allEntities);
+                        this.renderAll();
+                    } catch (err) {
+                        showToast('خطأ أثناء تحميل البيانات من Supabase: ' + (err.message || err), 'error');
+                    } finally {
+                        this._fetchCloudPromise = null;
+                    }
+                })();
+
+                return this._fetchCloudPromise;
             },
 
             async logout() {
@@ -5582,6 +5666,7 @@
                     try { await AppState.supabaseClient.auth.signOut(); } catch (e) { }
                 }
                 AppState.currentUser = null;
+                this.resetState();
                 document.getElementById('auth-screen').style.display = 'flex';
                 showToast('تم تسجيل الخروج بنجاح', 'info');
             },
@@ -6114,12 +6199,23 @@
                     let savedCustomerId = id;
 
                     if (id) {
-                        const { error } = await AppState.supabaseClient
+                        const { data, error } = await AppState.supabaseClient
                             .from('customers')
                             .update({ name, phone, address, notes, updated_at: new Date().toISOString() })
-                            .eq('id', id);
+                            .eq('id', id)
+                            .select()
+                            .single();
 
                         if (error) throw error;
+                        if (data) {
+                            const idx = (AppState.customers || []).findIndex(c => c.id === id);
+                            if (idx !== -1) {
+                                AppState.customers[idx] = data;
+                            } else {
+                                AppState.customers.push(data);
+                            }
+                            AppState.customers.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'));
+                        }
                     } else {
                         const { data, error } = await AppState.supabaseClient
                             .from('customers')
@@ -6129,10 +6225,12 @@
 
                         if (error) throw error;
                         savedCustomerId = data.id;
+                        if (data) {
+                            if (!AppState.customers) AppState.customers = [];
+                            AppState.customers.push(data);
+                            AppState.customers.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'));
+                        }
                     }
-
-                    // Cloud fetch to sync state
-                    await App.fetchCloudData();
 
                     if (this.isQuickFromInvoice) {
                         // Close customer modal ONLY - DO NOT close invoice modal!
@@ -6240,8 +6338,8 @@
 
                     if (error) throw error;
 
+                    AppState.customers = (AppState.customers || []).filter(item => item.id !== id);
                     showToast('تم حذف العميل بنجاح', 'success');
-                    await App.fetchCloudData();
                     this.renderTable();
                 } catch (err) {
                     showToast('فشل حذف العميل: ' + (err.message || err), 'error');
@@ -6421,22 +6519,39 @@
 
                 try {
                     if (id) {
-                        const { error } = await AppState.supabaseClient
+                        const { data, error } = await AppState.supabaseClient
                             .from('suppliers')
                             .update({ name, phone, address, notes, updated_at: new Date().toISOString() })
-                            .eq('id', id);
+                            .eq('id', id)
+                            .select()
+                            .single();
 
                         if (error) throw error;
+                        if (data) {
+                            const idx = (AppState.suppliers || []).findIndex(s => s.id === id);
+                            if (idx !== -1) {
+                                AppState.suppliers[idx] = data;
+                            } else {
+                                AppState.suppliers.push(data);
+                            }
+                            AppState.suppliers.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'));
+                        }
                     } else {
-                        const { error } = await AppState.supabaseClient
+                        const { data, error } = await AppState.supabaseClient
                             .from('suppliers')
-                            .insert([{ name, phone, address, notes, is_active: true }]);
+                            .insert([{ name, phone, address, notes, is_active: true }])
+                            .select()
+                            .single();
 
                         if (error) throw error;
+                        if (data) {
+                            if (!AppState.suppliers) AppState.suppliers = [];
+                            AppState.suppliers.push(data);
+                            AppState.suppliers.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'));
+                        }
                     }
 
                     this.closeModal();
-                    await App.fetchCloudData();
                     this.renderTable();
                     showToast('تم حفظ بيانات المورد سحابياً بنجاح', 'success');
                 } catch (err) {
@@ -6507,8 +6622,8 @@
 
                     if (error) throw error;
 
+                    AppState.suppliers = (AppState.suppliers || []).filter(item => item.id !== id);
                     showToast('تم حذف المورد بنجاح', 'success');
-                    await App.fetchCloudData();
                     this.renderTable();
                 } catch (err) {
                     showToast('فشل حذف المورد: ' + (err.message || err), 'error');
@@ -7078,7 +7193,7 @@
                     }
 
                     App.closeModals();
-                    await App.fetchCloudData();
+                    await App.refreshEntities(['products']);
                 } catch (err) {
                     showToast('فشل حفظ الصنف: ' + (err.message || err), 'error');
                 } finally {
@@ -7252,7 +7367,7 @@
 
                     showToast('تم حذف الصنف نهائياً بنجاح من قاعدة البيانات', 'success');
                     App.closeModals();
-                    await App.fetchCloudData();
+                    await App.refreshEntities(['products']);
                 } catch (err) {
                     showToast('فشل حذف الصنف: ' + (err.message || err), 'error');
                 } finally {
@@ -7310,7 +7425,7 @@
                     }
 
                     showToast(newStatus ? 'تمت إعادة تفعيل الصنف بنجاح وإتاحته في النظام' : 'تم إيقاف الصنف بنجاح وحجبه عن العمليات الجديدة مع حفظ رصيده وسجلاته', 'success');
-                    await App.fetchCloudData();
+                    await App.refreshEntities(['products']);
                 } catch (err) {
                     showToast('فشل تعديل حالة الصنف: ' + (err.message || err), 'error');
                 }
@@ -7542,7 +7657,7 @@
                         await this.approveReceipt(rec.id);
                     } else {
                         showToast('تم حفظ مسودة إذن الإضافة رقم ' + receipt_number + ' سحابياً', 'success');
-                        await App.fetchCloudData();
+                        await App.refreshEntities(['receipts']);
                     }
                 } catch (err) {
                     showToast('فشل حفظ إذن الإضافة: ' + (err.message || err), 'error');
@@ -7557,7 +7672,7 @@
 
                     if (error) throw error;
                     showToast(data.message || 'تم اعتماد إذن الإضافة وتحديث رصيد المخزون سحابياً', 'success');
-                    await App.fetchCloudData();
+                    await App.refreshEntities(['receipts', 'products', 'movements']);
 
                     setTimeout(() => {
                         if (confirm('تم اعتماد إذن الإضافة وإيداع البضاعة بالمخزن بنجاح.\n\nهل ترغب في طباعة إذن الاستلام الآن؟')) {
@@ -7796,7 +7911,7 @@
                         await this.approveIssue(iss.id);
                     } else {
                         showToast('تم حفظ مسودة إذن الصرف رقم ' + issue_number + ' سحابياً', 'success');
-                        await App.fetchCloudData();
+                        await App.refreshEntities(['issues']);
                     }
                 } catch (err) {
                     showToast('فشل حفظ إذن الصرف: ' + (err.message || err), 'error');
@@ -7811,7 +7926,7 @@
 
                     if (error) throw error;
                     showToast(data.message || 'تم اعتماد إذن الصرف وخصم الكميات من المخزون', 'success');
-                    await App.fetchCloudData();
+                    await App.refreshEntities(['issues', 'products', 'movements']);
 
                     setTimeout(() => {
                         if (confirm('تم اعتماد إذن الصرف بنجاح وخصم البضاعة من المخزن.\n\nهل ترغب في طباعة إذن الصرف الآن؟')) {
@@ -8590,7 +8705,7 @@
                         if (approveErr) throw approveErr;
 
                         showToast(approveRes.message || ('تم اعتماد الفاتورة رقم ' + invoice_number + ' وخصم المخزون بنجاح'), 'success');
-                        await App.fetchCloudData();
+                        await App.refreshEntities(['invoices', 'products', 'movements']);
 
                         setTimeout(() => {
                             if (confirm('تم اعتماد فاتورة المبيعات رقم (' + invoice_number + ') وخصم الكميات من المخزون بنجاح.\n\nهل ترغب في طباعة الفاتورة الآن؟')) {
@@ -8599,7 +8714,7 @@
                         }, 250);
                     } else {
                         showToast('تم حفظ مسودة الفاتورة رقم (' + invoice_number + ') بنجاح', 'success');
-                        await App.fetchCloudData();
+                        await App.refreshEntities(['invoices']);
                     }
                 } catch (err) {
                     showToast('فشل حفظ الفاتورة: ' + (err.message || err), 'error');
@@ -8623,7 +8738,7 @@
 
                     if (error) throw error;
                     showToast(data.message || 'تم اعتماد فاتورة المبيعات وخصم الكميات من المخزون بنجاح', 'success');
-                    await App.fetchCloudData();
+                    await App.refreshEntities(['invoices', 'products', 'movements']);
 
                     setTimeout(() => {
                         if (confirm('تم اعتماد الفاتورة بنجاح. هل ترغب في طباعتها الآن؟')) {
@@ -8655,7 +8770,7 @@
                     if (error) throw error;
                     App.closeModals();
                     showToast(data.message || 'تم إلغاء الفاتورة واسترجاع المخزون بنجاح', 'success');
-                    await App.fetchCloudData();
+                    await App.refreshEntities(['invoices', 'products', 'movements']);
                 } catch (err) {
                     showToast('فشل إلغاء الفاتورة: ' + (err.message || err), 'error');
                 }
@@ -8973,7 +9088,7 @@
 
                     App.closeModals();
                     showToast(data.message || 'تم اعتماد تسوية الجرد وتحديث رصيد المخزون', 'success');
-                    await App.fetchCloudData();
+                    await App.refreshEntities(['adjustments', 'products', 'movements']);
                 } catch (err) {
                     showToast('فشل اعتماد تسوية الجرد: ' + (err.message || err), 'error');
                 }

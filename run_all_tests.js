@@ -21,7 +21,9 @@ const tests = [
   'test_ui_cleanup_header_and_icons.js',
   'test_sales_invoices_actions_and_header_removal.js',
   'test_clean_device_supabase_init.js',
-  'test_mobile_ux_regression.js'
+  'test_mobile_ux_regression.js',
+  'test_phase1_egress_optimization.js',
+  'test_phase1_multiuser_validation.js'
 ];
 
 let allPassed = true;
