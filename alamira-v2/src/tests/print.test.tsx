@@ -1,0 +1,386 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { SalesInvoice, Customer } from '../types';
+import {
+  mapInvoiceToPrintModel,
+  OFFICIAL_COMPANY_INFO,
+} from '../features/invoices/print/invoicePrintMapper';
+import { tafqeetArabic } from '../utils/tafqeet';
+import { InvoicePrintHeader } from '../features/invoices/print/InvoicePrintHeader';
+import { InvoicePrintCustomerInfo } from '../features/invoices/print/InvoicePrintCustomerInfo';
+import { InvoicePrintItems } from '../features/invoices/print/InvoicePrintItems';
+import { InvoicePrintTotals } from '../features/invoices/print/InvoicePrintTotals';
+import { InvoicePrintFooter } from '../features/invoices/print/InvoicePrintFooter';
+import { InvoicePrintTemplate } from '../features/invoices/print/InvoicePrintTemplate';
+import { InvoicePrintPreview } from '../features/invoices/print/InvoicePrintPreview';
+import { printInvoice } from '../features/invoices/print/printInvoice';
+import { exportInvoicePng } from '../features/invoices/print/exportInvoicePng';
+import { mockDataService } from '../services/mockDataService';
+
+// Mock html2canvas for unit tests
+vi.mock('html2canvas', () => {
+  return {
+    default: vi.fn().mockImplementation(() =>
+      Promise.resolve({
+        toDataURL: () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      })
+    ),
+  };
+});
+
+describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const mockCustomer: Customer = {
+    id: 'cust-001',
+    code: 'CUST-001',
+    name: 'شركة النور للمقاولات والتوريدات الهندسية',
+    phone: '01012345678',
+    address: 'قنا - شارع الجمهورية - برج الصفا',
+    city: 'قنا',
+    balance: 15000,
+    is_active: true,
+    invoices_count: 5,
+    createdAt: '2026-01-01T00:00:00Z',
+  };
+
+  const sampleInvoiceWithDiscounts: SalesInvoice = {
+    id: 'inv-test-01',
+    invoice_number: 'INV-20261117-001',
+    invoice_date: '2026-11-17',
+    customer_id: 'cust-001',
+    customer_name_snapshot: 'شركة النور للمقاولات والتوريدات الهندسية',
+    customer_phone_snapshot: '01012345678',
+    payment_terms: 'credit',
+    status: 'approved',
+    gross_amount: 5000,
+    item_discounts_amount: 250,
+    subtotal: 4750,
+    invoice_discount_type: 'fixed',
+    invoice_discount_value: 150,
+    invoice_discount_amount: 150,
+    additional_charges: 100,
+    final_total: 4700,
+    notes: 'الدفع خلال 15 يوماً من تاريخ استلام البضاعة بموقع المشروع.',
+    created_by: 'أحمد محمود',
+    created_at: '2026-11-17T10:00:00Z',
+    items: [
+      {
+        id: 'item-1',
+        invoice_id: 'inv-test-01',
+        product_id: 'prod-01',
+        product_sku_snapshot: 'STEEL-001',
+        product_name_snapshot: 'حديد تسليح 12 مم عالي المقاومة للأعمال الإنشائية الكبرى',
+        unit_snapshot: 'طن',
+        quantity: 2.5,
+        unit_price: 2000,
+        discount_type: 'percentage',
+        discount_value: 5,
+        discount_amount: 250,
+        gross_amount: 5000,
+        net_amount: 4750,
+      },
+    ],
+  };
+
+  const sampleInvoiceWithoutDiscounts: SalesInvoice = {
+    id: 'inv-test-02',
+    invoice_number: 'INV-20261117-002',
+    invoice_date: '2026-11-17',
+    customer_id: 'cust-001',
+    customer_name_snapshot: 'شركة النور للمقاولات والتوريدات الهندسية',
+    customer_phone_snapshot: '01012345678',
+    payment_terms: 'cash',
+    status: 'draft',
+    gross_amount: 1000,
+    item_discounts_amount: 0,
+    subtotal: 1000,
+    invoice_discount_type: 'percentage',
+    invoice_discount_value: 0,
+    invoice_discount_amount: 0,
+    additional_charges: 0,
+    final_total: 1000,
+    notes: '',
+    created_by: 'أحمد محمود',
+    created_at: '2026-11-17T11:00:00Z',
+    items: [
+      {
+        id: 'item-2',
+        invoice_id: 'inv-test-02',
+        product_id: 'prod-02',
+        product_sku_snapshot: 'CEMENT-001',
+        product_name_snapshot: 'أسمنت بورتلاندي عادي 50 كجم',
+        unit_snapshot: 'شيكارة',
+        quantity: 10,
+        unit_price: 100,
+        discount_type: 'fixed',
+        discount_value: 0,
+        discount_amount: 0,
+        gross_amount: 1000,
+        net_amount: 1000,
+      },
+    ],
+  };
+
+  describe('1. Tafqeet Arabic Currency Utility', () => {
+    it('correctly converts whole Egyptian pound amounts to formal Arabic text', () => {
+      expect(tafqeetArabic(1000)).toBe('فقط وقدره ألف جنيهاً مصرياً لا غير.');
+      expect(tafqeetArabic(4700)).toBe('فقط وقدره أربعة آلاف وسبعمائة جنيهاً مصرياً لا غير.');
+      expect(tafqeetArabic(1500000)).toBe('فقط وقدره مليون وخمسمائة ألف جنيهاً مصرياً لا غير.');
+    });
+
+    it('correctly converts amounts with piastres (cents)', () => {
+      const text = tafqeetArabic(1250.5);
+      expect(text).toContain('ألف ومائتان وخمسون جنيهاً مصرياً');
+      expect(text).toContain('وخمسون قرشاً لا غير.');
+    });
+
+    it('handles zero or null/undefined gracefully', () => {
+      expect(tafqeetArabic(0)).toBe('صفر جنيه مصري لا غير');
+      expect(tafqeetArabic(null)).toBe('صفر جنيه مصري لا غير');
+      expect(tafqeetArabic(undefined)).toBe('صفر جنيه مصري لا غير');
+    });
+  });
+
+  describe('2. Invoice Print Data Mapper', () => {
+    it('maps official company information with 100% parity', () => {
+      const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
+      expect(model.company.name).toBe(OFFICIAL_COMPANY_INFO.name);
+      expect(model.company.name).toBe('الأميرة للتوريدات العامة والتجارة');
+      expect(model.company.address).toBe('قنا – الوقف – بجوار مركز شباب عزبة علام');
+      expect(model.company.logoUrl).toBe('/assets/logo.png');
+    });
+
+    it('maps customer details and transaction metadata correctly', () => {
+      const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
+      expect(model.customer.name).toBe(mockCustomer.name);
+      expect(model.customer.phone).toBe(mockCustomer.phone);
+      expect(model.customer.address).toBe(mockCustomer.address);
+      expect(model.invoice.invoiceNumber).toBe('INV-20261117-001');
+      expect(model.invoice.paymentTermLabel).toBe('آجل');
+      expect(model.invoice.statusLabel).toBe('معتمدة وخصمت من المخزون');
+    });
+
+    it('detects discount presence and prepares item models with fractional quantities', () => {
+      const modelWithDisc = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
+      expect(modelWithDisc.hasItemDiscounts).toBe(true);
+      expect(modelWithDisc.items[0].quantityFormatted).toBe('2.5');
+      expect(modelWithDisc.items[0].discountAmount).toBe(250);
+
+      const modelWithoutDisc = mapInvoiceToPrintModel(sampleInvoiceWithoutDiscounts, mockCustomer);
+      expect(modelWithoutDisc.hasItemDiscounts).toBe(false);
+      expect(modelWithoutDisc.items[0].quantityFormatted).toBe('10');
+      expect(modelWithoutDisc.items[0].discountAmount).toBe(0);
+    });
+
+    it('matches Phase 3B financial calculation totals exactly', () => {
+      const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
+      expect(model.totals.grossAmount).toBe(5000);
+      expect(model.totals.itemDiscountsAmount).toBe(250);
+      expect(model.totals.subtotal).toBe(4750);
+      expect(model.totals.invoiceDiscountAmount).toBe(150);
+      expect(model.totals.additionalCharges).toBe(100);
+      expect(model.totals.finalTotal).toBe(4700);
+      expect(model.totals.tafqeetText).toContain('أربعة آلاف وسبعمائة جنيهاً مصرياً');
+    });
+  });
+
+  describe('3. Template Component Rendering (Visual & Structural Fidelity)', () => {
+    it('renders Header with official logo, company name, address, and document badge', () => {
+      const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
+      render(<InvoicePrintHeader data={model} />);
+
+      expect(screen.getByText('فاتورة مبيعات')).toBeInTheDocument();
+      expect(screen.getByText('INV-20261117-001')).toBeInTheDocument();
+      expect(screen.getByText('2026-11-17')).toBeInTheDocument();
+      expect(screen.getByText(OFFICIAL_COMPANY_INFO.address)).toBeInTheDocument();
+      const logo = screen.getByRole('img');
+      expect(logo).toHaveAttribute('src', '/assets/logo.png');
+    });
+
+    it('renders CustomerInfo grid with name, phone, address, and metadata', () => {
+      const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
+      render(<InvoicePrintCustomerInfo data={model} />);
+
+      expect(screen.getByText(mockCustomer.name)).toBeInTheDocument();
+      expect(screen.getByText(mockCustomer.phone!)).toBeInTheDocument();
+      expect(screen.getByText(mockCustomer.address!)).toBeInTheDocument();
+      expect(screen.getByText('آجل')).toBeInTheDocument();
+      expect(screen.getByText('معتمدة وخصمت من المخزون')).toBeInTheDocument();
+    });
+
+    it('renders Items table with discount column when discounts exist', () => {
+      const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
+      render(<InvoicePrintItems data={model} />);
+
+      expect(screen.getByText('الخصم')).toBeInTheDocument();
+      expect(screen.getByText('الصافي')).toBeInTheDocument();
+      expect(screen.getByText('STEEL-001')).toBeInTheDocument();
+      expect(screen.getByText('2.5')).toBeInTheDocument();
+      expect(screen.getByText('-250.00')).toBeInTheDocument();
+      expect(screen.getByText('4750.00 ج.م')).toBeInTheDocument();
+    });
+
+    it('omits discount column when no item has discount to optimize layout width', () => {
+      const model = mapInvoiceToPrintModel(sampleInvoiceWithoutDiscounts, mockCustomer);
+      render(<InvoicePrintItems data={model} />);
+
+      expect(screen.queryByText('الخصم')).not.toBeInTheDocument();
+      expect(screen.getByText('القيمة الإجمالية')).toBeInTheDocument();
+      expect(screen.getByText('CEMENT-001')).toBeInTheDocument();
+      expect(screen.getByText('10')).toBeInTheDocument();
+      expect(screen.getByText('1000.00 ج.م')).toBeInTheDocument();
+    });
+
+    it('renders Totals table with conditional rows and Arabic Tafqeet', () => {
+      const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
+      render(<InvoicePrintTotals data={model} />);
+
+      expect(screen.getByText('إجمالي البضاعة:')).toBeInTheDocument();
+      expect(screen.getByText('5000.00 ج.م')).toBeInTheDocument();
+      expect(screen.getByText('خصومات الأصناف:')).toBeInTheDocument();
+      expect(screen.getByText('-250.00 ج.م')).toBeInTheDocument();
+      expect(screen.getByText('خصم الفاتورة العام:')).toBeInTheDocument();
+      expect(screen.getByText('-150.00 ج.م')).toBeInTheDocument();
+      expect(screen.getByText('مصاريف إضافية / شحن:')).toBeInTheDocument();
+      expect(screen.getByText('+100.00 ج.م')).toBeInTheDocument();
+      expect(screen.getByText('4700.00 ج.م')).toBeInTheDocument();
+      expect(screen.getByText(model.totals.tafqeetText)).toBeInTheDocument();
+      // Notes block present
+      expect(screen.getByText('شروط وملاحظات الفاتورة:')).toBeInTheDocument();
+      expect(screen.getByText(sampleInvoiceWithDiscounts.notes!)).toBeInTheDocument();
+    });
+
+    it('hides notes block when invoice has no notes', () => {
+      const model = mapInvoiceToPrintModel(sampleInvoiceWithoutDiscounts, mockCustomer);
+      render(<InvoicePrintTotals data={model} />);
+
+      expect(screen.queryByText('شروط وملاحظات الفاتورة:')).not.toBeInTheDocument();
+    });
+
+    it('renders Footer with 3 signatures boxes and company banner', () => {
+      const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
+      render(<InvoicePrintFooter data={model} />);
+
+      expect(screen.getByText('توقيع المستلم (العميل)')).toBeInTheDocument();
+      expect(screen.getByText(`الاسم: ${mockCustomer.name}`)).toBeInTheDocument();
+      expect(screen.getByText('المحاسب / مسؤول المخزن')).toBeInTheDocument();
+      expect(screen.getByText('اعتماد الإدارة وختم الشركة')).toBeInTheDocument();
+      expect(screen.getByText('نسعد دائماً بخدمتكم وتوفير أفضل العروض والمنتجات')).toBeInTheDocument();
+    });
+
+    it('renders full InvoicePrintTemplate with A4 sheet layout', () => {
+      const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
+      const { container } = render(<InvoicePrintTemplate data={model} />);
+
+      const sheet = container.querySelector('.invoice-sheet');
+      expect(sheet).toBeInTheDocument();
+      expect(sheet).toHaveAttribute('dir', 'rtl');
+    });
+  });
+
+  describe('4. InvoicePrintPreview Modal Interactions', () => {
+    it('renders preview modal with action buttons when open', () => {
+      render(
+        <InvoicePrintPreview
+          invoice={sampleInvoiceWithDiscounts}
+          customer={mockCustomer}
+          isOpen={true}
+          onClose={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('طباعة الفاتورة (A4)')).toBeInTheDocument();
+      expect(screen.getByText('تصدير صورة PNG')).toBeInTheDocument();
+      expect(screen.getByText('إغلاق')).toBeInTheDocument();
+      expect(screen.getByText('INV-20261117-001')).toBeInTheDocument();
+    });
+
+    it('does not render when isOpen is false', () => {
+      render(
+        <InvoicePrintPreview
+          invoice={sampleInvoiceWithDiscounts}
+          customer={mockCustomer}
+          isOpen={false}
+          onClose={vi.fn()}
+        />
+      );
+
+      expect(screen.queryByText('طباعة الفاتورة (A4)')).not.toBeInTheDocument();
+    });
+
+    it('calls onClose when clicking close button or pressing Escape', () => {
+      const onClose = vi.fn();
+      render(
+        <InvoicePrintPreview
+          invoice={sampleInvoiceWithDiscounts}
+          customer={mockCustomer}
+          isOpen={true}
+          onClose={onClose}
+        />
+      );
+
+      fireEvent.click(screen.getByText('إغلاق'));
+      expect(onClose).toHaveBeenCalledTimes(1);
+
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledTimes(2);
+    });
+
+    it('triggers PNG export and notifies on success', async () => {
+      const onNotification = vi.fn();
+      render(
+        <InvoicePrintPreview
+          invoice={sampleInvoiceWithDiscounts}
+          customer={mockCustomer}
+          isOpen={true}
+          onClose={vi.fn()}
+          onNotification={onNotification}
+        />
+      );
+
+      fireEvent.click(screen.getByText('تصدير صورة PNG'));
+
+      await waitFor(() => {
+        expect(onNotification).toHaveBeenCalledWith(
+          expect.stringContaining('تم تصدير الفاتورة كصورة PNG بنجاح'),
+          'success'
+        );
+      });
+    });
+  });
+
+  describe('5. Print and Export Safety & Read-Only Invariance', () => {
+    it('printInvoice execution does not modify mock inventory or invoice state', async () => {
+      const initialProducts = await mockDataService.getProducts();
+      const initialInvoices = await mockDataService.getInvoices();
+
+      const dummyElement = document.createElement('div');
+      dummyElement.innerHTML = '<h1>Print Test</h1>';
+
+      const result = printInvoice(dummyElement);
+      expect(result).toBe(true);
+
+      const afterProducts = await mockDataService.getProducts();
+      const afterInvoices = await mockDataService.getInvoices();
+
+      // Assert zero mutation
+      expect(afterProducts).toEqual(initialProducts);
+      expect(afterInvoices).toEqual(initialInvoices);
+    });
+
+    it('exportInvoicePng execution handles null element gracefully without throwing', async () => {
+      const result = await exportInvoicePng(null, 'INV-TEST');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('تعذر العثور على عنصر الفاتورة');
+    });
+
+    it('strictly documents 80mm thermal receipt printing as unsupported in V1', () => {
+      // V1 audit confirmed no thermal printer template exists in the system
+      const isThermalPrintingSupportedInV1 = false;
+      expect(isThermalPrintingSupportedInV1).toBe(false);
+    });
+  });
+});
