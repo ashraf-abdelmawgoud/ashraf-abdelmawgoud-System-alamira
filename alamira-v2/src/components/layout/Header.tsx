@@ -1,6 +1,7 @@
-import React from 'react'
-import { Menu, Calendar, User, Database } from 'lucide-react'
+import React, { useState } from 'react'
+import { Menu, Calendar, User, Database, ArrowLeftRight, LogOut, CheckCircle2, Loader2 } from 'lucide-react'
 import { formatDate } from '@/lib/formatters'
+import { useAuth } from '@/auth'
 
 export interface HeaderProps {
   onOpenMobileMenu: () => void
@@ -12,48 +13,116 @@ export const Header: React.FC<HeaderProps> = ({
   currentTitle = 'لوحة التحكم',
 }) => {
   const todayFormatted = formatDate(new Date(), false)
+  const { currentUser, toggleRole, isMock, logout } = useAuth()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true)
+      await logout()
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 w-full items-center justify-between border-b border-[#E2E8F0] bg-white px-3 sm:px-6 shrink-0 shadow-xs">
+    <header className="sticky top-0 z-20 flex h-14 w-full items-center justify-between border-b border-[#D9E2EC] bg-white px-3 sm:px-6 shrink-0 shadow-xs">
       {/* Right side: Mobile Menu Button & Clean Page Title */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         <button
           type="button"
           onClick={onOpenMobileMenu}
-          className="inline-flex lg:hidden items-center justify-center rounded-md p-1.5 text-[#0F766E] hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
+          className="inline-flex lg:hidden items-center justify-center rounded-md p-1.5 text-[#11243A] hover:text-[#0F766E] hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
           aria-label="فتح القائمة الرئيسية"
         >
           <Menu className="w-5 h-5" />
         </button>
 
-        <h2 className="text-sm sm:text-base font-bold text-[#11243A] truncate flex items-center gap-2">
+        <h2 className="text-sm sm:text-base font-extrabold text-[#11243A] truncate flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#0F766E] inline-block shrink-0" />
           <span>{currentTitle}</span>
         </h2>
       </div>
 
-      {/* Left side: Date, Small Demo Pill & User Profile */}
+      {/* Left side: Date, Connection Indicator & User Profile */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* Compact Demo Indicator */}
-        <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-medium">
-          <Database className="w-3.5 h-3.5 text-[#0F766E]" />
-          <span>بيانات تجريبية</span>
-        </div>
+        {/* Connection Mode Indicator */}
+        {isMock ? (
+          <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F8FAFC] text-slate-700 border border-[#D9E2EC] text-[11px] font-medium">
+            <Database className="w-3.5 h-3.5 text-[#0F766E]" />
+            <span>بيانات تجريبية</span>
+          </div>
+        ) : (
+          <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-semibold">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>متصل بـ Supabase</span>
+          </div>
+        )}
 
         {/* Date Display */}
-        <div className="hidden md:flex items-center gap-1.5 text-xs text-[#64748B] bg-slate-50 border border-[#E2E8F0] rounded-md px-2.5 py-1 font-medium">
-          <Calendar className="w-3.5 h-3.5 text-[#0F766E]" />
+        <div className="hidden md:flex items-center gap-1.5 text-xs text-[#64748B] bg-[#F8FAFC] border border-[#D9E2EC] rounded-md px-2.5 py-1 font-medium">
+          <Calendar className="w-3.5 h-3.5 text-[#64748B]" />
           <span>{todayFormatted}</span>
         </div>
 
-        {/* Minimal User Profile Avatar */}
-        <div className="flex items-center gap-2 rounded-md bg-slate-50 border border-[#E2E8F0] px-2 py-1">
+        {/* Interactive User Profile & Actions */}
+        <div className="flex items-center gap-2 rounded-md bg-[#F8FAFC] border border-[#D9E2EC] px-2 py-1">
           <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-[#11243A] text-white font-bold text-xs border border-slate-300 shrink-0">
             <User className="w-3.5 h-3.5" />
           </div>
-          <span className="hidden sm:inline-block text-xs font-semibold text-[#11243A]">
-            مدير النظام
-          </span>
+          <div className="hidden sm:flex flex-col text-right">
+            <span className="text-xs font-semibold text-[#11243A] leading-tight">
+              {currentUser.name}
+            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-slate-500 font-medium">
+                {currentUser.role === 'ADMIN' ? 'مدير النظام' : 'مسؤول مبيعات'}
+              </span>
+              {currentUser.is_active === false && (
+                <span className="text-[9px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded px-1 leading-none">
+                  معطل
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* If Mock Mode: Show Role Switcher */}
+          {isMock ? (
+            <button
+              type="button"
+              onClick={toggleRole}
+              title={
+                currentUser.role === 'ADMIN'
+                  ? 'تبديل الدور (محاكاة تطوير) إلى: مسؤول المبيعات'
+                  : 'تبديل الدور (محاكاة تطوير) إلى: مدير النظام'
+              }
+              className="flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded bg-slate-100 hover:bg-[#0F766E] hover:text-white text-slate-700 border border-slate-200 transition-colors cursor-pointer font-medium"
+            >
+              <ArrowLeftRight className="w-3 h-3 text-[#0F766E]" />
+              <span className="hidden md:inline">
+                {currentUser.role === 'ADMIN' ? 'تبديل لمسؤول مبيعات' : 'تبديل لمدير'}
+              </span>
+              <span className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-1 hidden lg:inline font-semibold">
+                محاكاة
+              </span>
+            </button>
+          ) : (
+            /* If Real Mode: Show Secure Logout Button */
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              title="تسجيل الخروج وإنهاء الجلسة"
+              className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer font-medium disabled:opacity-50"
+            >
+              {isLoggingOut ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-600" />
+              ) : (
+                <LogOut className="w-3.5 h-3.5 text-rose-600" />
+              )}
+              <span className="hidden sm:inline">تسجيل الخروج</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

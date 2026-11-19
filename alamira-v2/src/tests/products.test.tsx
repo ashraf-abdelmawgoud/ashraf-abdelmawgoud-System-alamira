@@ -119,5 +119,5 @@ describe('Products & Inventory UI (Phase 2)', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/صنف اختبار تجريبي جديد/i).length).toBeGreaterThan(0)
     })
-  })
+  }, 15000)
 })

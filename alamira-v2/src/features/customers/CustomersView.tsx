@@ -5,11 +5,13 @@ import { CustomerMobileCard } from './CustomerMobileCard'
 import { CustomerFormModal } from './CustomerFormModal'
 import { CustomerDetailsModal } from './CustomerDetailsModal'
 import { LoadingState, EmptyState, ConfirmDialog, AlertBanner } from '@/components/ui'
-import { mockDataService } from '@/services/mockDataService'
+import { dataService } from '@/services/dataService'
 import { Customer, CustomerFormData } from '@/types'
-import { Users, Plus } from 'lucide-react'
+import { Users } from 'lucide-react'
+import { useAuth } from '@/auth'
 
 export const CustomersView: React.FC = () => {
+  const { currentUser } = useAuth()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [searchQuery, setSearchQuery] = useState<string>('')
@@ -36,7 +38,7 @@ export const CustomersView: React.FC = () => {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await mockDataService.getCustomers({
+      const data = await dataService.getCustomers({
         search: searchQuery,
         status: selectedStatus,
       })
@@ -64,21 +66,27 @@ export const CustomersView: React.FC = () => {
   }
 
   const handleSaveCustomer = async (formData: CustomerFormData) => {
-    if (editingCustomer) {
-      await mockDataService.updateCustomer(editingCustomer.id, formData)
-      showNotification(`تم تحديث بيانات العميل (${formData.name}) بنجاح`)
-    } else {
-      await mockDataService.createCustomer(formData)
-      showNotification(`تمت إضافة العميل الجديد (${formData.name}) بنجاح`)
+    try {
+      if (editingCustomer) {
+        await dataService.updateCustomer(editingCustomer.id, formData, currentUser)
+        showNotification(`تم تحديث بيانات العميل (${formData.name}) بنجاح`)
+      } else {
+        await dataService.createCustomer(formData, currentUser)
+        showNotification(`تمت إضافة العميل الجديد (${formData.name}) بنجاح`)
+      }
+      await loadData()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'فشل حفظ بيانات العميل'
+      showNotification(msg, 'error')
+      throw err
     }
-    await loadData()
   }
 
   const handleDeleteCustomer = async () => {
     if (!deletingCustomer) return
     setIsDeleting(true)
     try {
-      await mockDataService.deleteCustomer(deletingCustomer.id)
+      await dataService.deleteCustomer(deletingCustomer.id, currentUser)
       showNotification(`تم حذف العميل (${deletingCustomer.name}) بنجاح`, 'info')
       setDeletingCustomer(null)
       await loadData()
@@ -138,9 +146,8 @@ export const CustomersView: React.FC = () => {
             <button
               type="button"
               onClick={handleOpenAddModal}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
+              className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-[#0F766E] rounded-lg hover:bg-[#115E59] transition-colors cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
               <span>إضافة عميل جديد</span>
             </button>
           }

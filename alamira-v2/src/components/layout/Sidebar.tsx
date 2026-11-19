@@ -2,7 +2,8 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { AL_AMIRA_COMPANY } from '@/domain/company'
-import { navigationItems } from './navigation'
+import { getNavigationItemsForUser } from './navigation'
+import { useAuth } from '@/auth'
 
 export interface SidebarProps {
   className?: string
@@ -10,6 +11,8 @@ export interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigate }) => {
+  const { currentUser } = useAuth()
+  const visibleItems = getNavigationItemsForUser(currentUser)
   return (
     <aside
       className={cn(
@@ -31,10 +34,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigate }) => {
 
       {/* Navigation List */}
       <nav className="flex-1 overflow-y-auto px-2.5 py-3 space-y-1">
-        <div className="px-3 pb-1 text-[10.5px] font-semibold text-slate-400 tracking-wider uppercase">
+        <div className="px-3 pb-1 text-[10.5px] font-bold text-slate-400 tracking-wider uppercase">
           القائمة الرئيسية
         </div>
-        {navigationItems.map((item) => {
+        {visibleItems.map((item) => {
           const Icon = item.icon
 
           if (item.disabled) {
@@ -42,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigate }) => {
               <div
                 key={item.name}
                 title={item.disabledReason}
-                className="flex items-center justify-between h-9 px-3 rounded-md text-[13px] font-medium text-slate-500 cursor-not-allowed bg-slate-900/30"
+                className="flex items-center justify-between h-9 px-3 rounded-md text-[13.5px] font-semibold text-slate-500 cursor-not-allowed bg-slate-900/30"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Icon className="w-4 h-4 text-slate-600 shrink-0" />
@@ -63,21 +66,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigate }) => {
               onClick={onNavigate}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center justify-between h-9 px-3 rounded-md text-[13px] font-medium transition-all duration-150',
+                  'group flex items-center justify-between h-9 px-3 rounded-md text-[13.5px] font-semibold transition-all duration-150',
                   isActive
-                    ? 'bg-[#0F766E] text-white font-semibold border-r-[3.5px] border-[#D7A44A] shadow-xs'
+                    ? 'bg-[#0F766E] text-white font-extrabold border-r-[3.5px] border-[#D7A44A] shadow-xs'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 )
               }
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Icon className="w-4 h-4 text-slate-400 group-hover:text-white shrink-0" />
-                <span className="truncate">{item.name}</span>
-              </div>
-              {item.badge && (
-                <span className="text-[10.5px] py-0.5 px-2 rounded-full font-medium bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
-                  {item.badge}
-                </span>
+              {({ isActive }) => (
+                <>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Icon
+                      className={cn(
+                        'w-4 h-4 shrink-0 transition-colors',
+                        isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
+                      )}
+                    />
+                    <span className="truncate">{item.name}</span>
+                  </div>
+                  {item.badge && (
+                    <span className="text-[11px] py-0.5 px-2 rounded-full font-extrabold bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
+                      {item.badge}
+                    </span>
+                  )}
+                </>
               )}
             </NavLink>
           )

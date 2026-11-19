@@ -3,6 +3,7 @@ import { Badge, Button } from '@/components/ui'
 import { Customer } from '@/types'
 import { formatCurrency, formatNumber } from '@/lib/formatters'
 import { Trash2, Phone, MapPin } from 'lucide-react'
+import { useAuth } from '@/auth'
 
 export interface CustomerMobileCardProps {
   customer: Customer
@@ -17,6 +18,7 @@ export const CustomerMobileCard: React.FC<CustomerMobileCardProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const { canEditCustomer, canDeleteCustomer } = useAuth()
   return (
     <div className="rounded-xl border border-neutral-200/90 bg-white p-3.5 shadow-xs space-y-3 text-right">
       {/* Header */}
@@ -81,23 +83,27 @@ export const CustomerMobileCard: React.FC<CustomerMobileCardProps> = ({
           >
             تفاصيل
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => onEdit(customer)}
-            className="text-xs h-8 px-2.5"
-          >
-            تعديل
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onDelete(customer)}
-            className="text-xs h-8 px-2 text-neutral-400 hover:text-rose-600"
-            aria-label="حذف العميل"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          {canEditCustomer(customer) && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onEdit(customer)}
+              className="text-xs h-8 px-2.5"
+            >
+              تعديل
+            </Button>
+          )}
+          {canDeleteCustomer && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(customer)}
+              className="text-xs h-8 px-2 text-neutral-400 hover:text-rose-600"
+              aria-label="حذف العميل"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </div>
     </div>

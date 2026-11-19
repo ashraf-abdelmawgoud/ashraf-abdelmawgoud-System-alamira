@@ -37,10 +37,10 @@ export const ReportMetricCards: React.FC<ReportMetricCardsProps> = ({ metrics })
       subText: 'text-[#64748B]',
     },
     blue: {
-      border: 'border-blue-200',
-      bg: 'bg-blue-50/70',
-      text: 'text-blue-800',
-      subText: 'text-blue-600',
+      border: 'border-[#CBD5E1]',
+      bg: 'bg-slate-50',
+      text: 'text-[#11243A]',
+      subText: 'text-[#64748B]',
     },
   };
 

@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { Button, EmptyState } from '@/components/ui'
-import { AlertCircle, Home } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 
 export const NotFoundPage: React.FC = () => {
   return (
@@ -12,7 +12,7 @@ export const NotFoundPage: React.FC = () => {
         description="ربما تم نقل الصفحة أو أن الرابط غير صحيح. يمكنك العودة إلى لوحة التحكم الرئيسية."
         action={
           <Link to="/">
-            <Button startIcon={<Home className="w-4 h-4" />}>
+            <Button>
               العودة للوحة التحكم
             </Button>
           </Link>

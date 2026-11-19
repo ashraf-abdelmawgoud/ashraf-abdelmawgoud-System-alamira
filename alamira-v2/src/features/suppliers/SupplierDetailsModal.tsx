@@ -2,7 +2,7 @@ import React from 'react'
 import { Modal, Button, Badge } from '@/components/ui'
 import { Supplier } from '@/types'
 import { formatCurrency, formatNumber } from '@/lib/formatters'
-import { Truck, Phone, MapPin, FileText, Edit3, DollarSign } from 'lucide-react'
+import { Truck, Phone, MapPin, FileText, DollarSign } from 'lucide-react'
 
 export interface SupplierDetailsModalProps {
   isOpen: boolean
@@ -35,7 +35,6 @@ export const SupplierDetailsModal: React.FC<SupplierDetailsModalProps> = ({
               onClose()
               onEdit(supplier)
             }}
-            startIcon={<Edit3 className="w-4 h-4" />}
           >
             تعديل البيانات
           </Button>

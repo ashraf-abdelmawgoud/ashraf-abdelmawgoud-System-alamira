@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: 'Cairo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-cairo: 'Cairo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
 @layer base {
   :root {
     --font-cairo: 'Cairo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -52,10 +57,11 @@
 
   *, *::before, *::after {
     box-sizing: border-box;
+    font-family: 'Cairo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
 
   html {
-    font-family: var(--font-cairo);
+    font-family: 'Cairo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     direction: rtl;
     text-align: right;
     overflow-x: hidden;
@@ -66,12 +72,13 @@
   body {
     background-color: var(--bg-page);
     color: var(--text-dark);
+    font-family: 'Cairo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
     max-width: 100%;
     margin: 0;
     padding: 0;
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.5;
     font-variant-numeric: tabular-nums;
   }
@@ -107,27 +114,28 @@
 
 .inv-number-badge {
   display: inline-block;
-  padding: 2px 7px;
+  padding: 3px 8px;
   background: #f8fafc;
-  color: #11243a;
-  font-weight: 600;
-  font-size: 11.5px;
+  color: #0f172a;
+  font-weight: 800;
+  font-size: 12.5px;
   border-radius: 4px;
   border: 1px solid #e2e8f0;
   direction: ltr;
   unicode-bidi: isolate;
-  font-family: monospace, sans-serif;
+  font-family: 'Cairo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Action button pill matching refined enterprise spec */
+/* Standardized Enterprise Action Button Pills */
 .action-btn-pill {
   width: 28px;
   height: 28px;
+  min-width: 28px;
   padding: 0;
   border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #D9E2EC;
   background: #ffffff;
-  color: #475569;
+  color: #11243A;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -135,14 +143,74 @@
   font-size: 12px;
   transition: all 0.18s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  outline: none;
 }
 
 .action-btn-pill:hover {
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
-  border-color: #cbd5e1;
-  color: #0f766e;
-  background: #f8fafc;
+  border-color: #CBD5E1;
+  color: #11243A;
+  background: #F1F5F9;
+}
+
+.action-btn-pill:focus-visible {
+  ring: 2px solid #11243A;
+  ring-offset: 1px;
+}
+
+.action-btn-pill-muted {
+  background: #F8FAFC;
+  border-color: #D9E2EC;
+  color: #64748B;
+}
+
+.action-btn-pill-muted:hover {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+  color: #11243A;
+}
+
+.action-btn-pill-positive {
+  background: #F0FDF4;
+  border-color: #A7F3D0;
+  color: #0F766E;
+}
+
+.action-btn-pill-positive:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(15, 118, 110, 0.12);
+  background: #DCFCE7;
+  border-color: #6EE7B7;
+  color: #0F766E;
+}
+
+.action-btn-pill-warning {
+  background: #FFFBEB;
+  border-color: #FDE68A;
+  color: #D97706;
+}
+
+.action-btn-pill-warning:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(217, 119, 6, 0.12);
+  background: #FEF3C7;
+  border-color: #FCD34D;
+  color: #B45309;
+}
+
+.action-btn-pill-danger {
+  background: #FEF2F2;
+  border-color: #FECACA;
+  color: #DC2626;
+}
+
+.action-btn-pill-danger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.12);
+  background: #FEE2E2;
+  border-color: #FCA5A5;
+  color: #B91C1C;
 }
 
 /* Official A4 Print Styling (Parity with Al-Amira V1) */

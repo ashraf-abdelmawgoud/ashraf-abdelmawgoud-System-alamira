@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Plus, Trash2, AlertCircle } from 'lucide-react'
+import { Trash2, AlertCircle } from 'lucide-react'
 import { Modal, Button, Input } from '@/components/ui'
 import { formatCurrency, formatNumber } from '@/lib/formatters'
 import { Product, Supplier, StockReceiptFormData } from '@/types'
@@ -196,7 +196,6 @@ export const ReceiptFormModal: React.FC<ReceiptFormModalProps> = ({
               onClick={addRow}
               className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
             >
-              <Plus className="w-4 h-4 ml-1" />
               إضافة صنف آخر
             </Button>
           </div>

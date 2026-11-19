@@ -2,7 +2,8 @@ import React from 'react'
 import { Badge, Button } from '@/components/ui'
 import { Product } from '@/types'
 import { formatCurrency, formatNumber } from '@/lib/formatters'
-import { Eye, Edit3, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
+import { useAuth } from '@/auth'
 
 export interface ProductMobileCardProps {
   product: Product
@@ -17,6 +18,8 @@ export const ProductMobileCard: React.FC<ProductMobileCardProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const { canViewCostPrice, canViewExactStock, hasPermission } = useAuth()
+  const canManage = hasPermission('products:manage')
   const stock = product.current_stock ?? product.currentStock ?? 0
   const min = product.min_stock_level ?? product.minStockLevel ?? 5
   const sellingPrice = product.selling_price ?? product.sellingPrice ?? 0
@@ -26,20 +29,24 @@ export const ProductMobileCard: React.FC<ProductMobileCardProps> = ({
     if (stock <= 0) {
       return (
         <Badge variant="danger" size="sm" dot>
-          نفد من المخزن
+          {canViewExactStock ? 'نفد من المخزن' : 'غير متوفر'}
         </Badge>
       )
     }
     if (stock <= min) {
       return (
         <Badge variant="warning" size="sm" dot>
-          منخفض ({formatNumber(stock)} {product.unit})
+          {canViewExactStock
+            ? `منخفض (${formatNumber(stock)} ${product.unit})`
+            : 'رصيد منخفض'}
         </Badge>
       )
     }
     return (
       <Badge variant="emerald" size="sm" dot>
-        {formatNumber(stock)} {product.unit}
+        {canViewExactStock
+          ? `${formatNumber(stock)} ${product.unit}`
+          : 'متوفر'}
       </Badge>
     )
   }
@@ -50,7 +57,7 @@ export const ProductMobileCard: React.FC<ProductMobileCardProps> = ({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+            <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
               {product.sku || product.code}
             </span>
             <span className="text-[11px] text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded">
@@ -65,53 +72,57 @@ export const ProductMobileCard: React.FC<ProductMobileCardProps> = ({
       </div>
 
       {/* Pricing & Stock Grid */}
-      <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-neutral-50/70 border border-neutral-100 text-xs">
+      <div className={`grid ${canViewCostPrice ? 'grid-cols-2' : 'grid-cols-1'} gap-2 p-2.5 rounded-lg bg-neutral-50/70 border border-neutral-100 text-xs`}>
         <div>
-          <span className="text-neutral-500 block text-[11px]">سعر البيع</span>
+          <span className="text-neutral-500 block text-[11px]">سعر البيع المعتمد</span>
           <span className="font-extrabold text-sm text-emerald-700">
             {formatCurrency(sellingPrice)}
           </span>
         </div>
-        <div>
-          <span className="text-neutral-500 block text-[11px]">التكلفة التقريبية</span>
-          <span className="font-semibold text-neutral-700">
-            {formatCurrency(purchasePrice)}
-          </span>
-        </div>
+        {canViewCostPrice && (
+          <div>
+            <span className="text-neutral-500 block text-[11px]">التكلفة التقريبية</span>
+            <span className="font-semibold text-neutral-700">
+              {formatCurrency(purchasePrice)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Action Buttons Bar */}
-      <div className="flex items-center justify-between gap-2 pt-1 border-t border-neutral-100">
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+        <div className="flex items-center gap-1.5">
           <Button
             variant="outline"
             size="sm"
             onClick={() => onView(product)}
-            startIcon={<Eye className="w-3.5 h-3.5" />}
-            className="text-xs h-8 px-2.5"
+            className="text-xs h-7.5 px-2.5 text-[#11243A] border-[#D9E2EC] hover:bg-slate-50"
           >
             تفاصيل
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => onEdit(product)}
-            startIcon={<Edit3 className="w-3.5 h-3.5" />}
-            className="text-xs h-8 px-2.5"
-          >
-            تعديل
-          </Button>
+          {canManage && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onEdit(product)}
+              className="text-xs h-7.5 px-2.5 text-[#64748B] hover:text-[#11243A]"
+            >
+              تعديل
+            </Button>
+          )}
         </div>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onDelete(product)}
-          className="text-xs h-8 px-2 text-neutral-400 hover:text-rose-600 hover:bg-rose-50"
-          aria-label="حذف الصنف"
-        >
-          <Trash2 className="w-4 h-4" />
-        </Button>
+        {canManage && (
+          <button
+            type="button"
+            onClick={() => onDelete(product)}
+            className="action-btn-pill action-btn-pill-danger"
+            aria-label={`حذف ${product.name}`}
+            title="حذف الصنف"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-[#DC2626]" />
+          </button>
+        )}
       </div>
     </div>
   )

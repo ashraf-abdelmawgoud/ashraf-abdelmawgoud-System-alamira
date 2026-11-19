@@ -7,11 +7,11 @@ import {
   TableHead,
   TableCell,
   Badge,
-  Button,
 } from '@/components/ui'
 import { Customer } from '@/types'
 import { formatCurrency, formatNumber } from '@/lib/formatters'
 import { Eye, Edit3, Trash2, Phone } from 'lucide-react'
+import { useAuth } from '@/auth'
 
 export interface CustomersTableProps {
   customers: Customer[]
@@ -26,6 +26,7 @@ export const CustomersTable: React.FC<CustomersTableProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const { canEditCustomer, canDeleteCustomer } = useAuth()
   return (
     <div className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-xs">
       <Table>
@@ -51,7 +52,7 @@ export const CustomersTable: React.FC<CustomersTableProps> = ({
                 {c.phone ? (
                   <a
                     href={`tel:${c.phone}`}
-                    className="text-[#0F766E] hover:underline flex items-center gap-1 font-mono"
+                    className="text-[#0F766E] hover:underline flex items-center gap-1 tabular-nums"
                     dir="ltr"
                   >
                     <Phone className="w-3 h-3 text-slate-400" />
@@ -83,34 +84,48 @@ export const CustomersTable: React.FC<CustomersTableProps> = ({
               </TableCell>
 
               <TableCell className="text-center">
-                <div className="flex items-center justify-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                <div className="flex items-center justify-center gap-1.5">
+                  <button
+                    type="button"
                     onClick={() => onView(c)}
                     className="action-btn-pill"
+                    title={`عرض تفاصيل ${c.name}`}
                     aria-label={`عرض تفاصيل ${c.name}`}
                   >
-                    <Eye className="w-3.5 h-3.5 text-[#0F766E]" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onEdit(c)}
-                    className="action-btn-pill"
-                    aria-label={`تعديل ${c.name}`}
-                  >
-                    <Edit3 className="w-3.5 h-3.5 text-[#0284C7]" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onDelete(c)}
-                    className="action-btn-pill"
-                    aria-label={`حذف ${c.name}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-[#DC2626]" />
-                  </Button>
+                    <Eye className="w-3.5 h-3.5 text-[#11243A]" />
+                  </button>
+                  {canEditCustomer(c) ? (
+                    <button
+                      type="button"
+                      onClick={() => onEdit(c)}
+                      className="action-btn-pill action-btn-pill-muted"
+                      title={`تعديل ${c.name}`}
+                      aria-label={`تعديل ${c.name}`}
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-[#64748B]" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="action-btn-pill opacity-40 cursor-not-allowed text-slate-400"
+                      title="تعديل العميل متاح لمنشئ السجل فقط أو مدير النظام"
+                      aria-label="تعديل غير متاح"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-slate-400" />
+                    </button>
+                  )}
+                  {canDeleteCustomer && (
+                    <button
+                      type="button"
+                      onClick={() => onDelete(c)}
+                      className="action-btn-pill action-btn-pill-danger"
+                      title={`حذف ${c.name}`}
+                      aria-label={`حذف ${c.name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-[#DC2626]" />
+                    </button>
+                  )}
                 </div>
               </TableCell>
             </TableRow>

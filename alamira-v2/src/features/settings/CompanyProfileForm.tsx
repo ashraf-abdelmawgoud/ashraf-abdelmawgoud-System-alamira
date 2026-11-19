@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Save, RotateCcw } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { CompanyProfile, OFFICIAL_COMPANY_PROFILE_DEFAULT } from './types';
+import { dataService } from '@/services/dataService';
 
 interface CompanyProfileFormProps {
   onSaveNotification?: (msg: string) => void;
@@ -31,6 +32,10 @@ export const CompanyProfileForm: React.FC<CompanyProfileFormProps> = ({
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('alamira_company_profile', JSON.stringify(profile));
+    dataService.logSettingsUpdate('company_profile', 'بيانات وهوية المنشأة', {
+      name: profile.name,
+      phone: profile.phone,
+    });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
     if (onSaveNotification) {
@@ -65,10 +70,9 @@ export const CompanyProfileForm: React.FC<CompanyProfileFormProps> = ({
         <button
           type="button"
           onClick={handleReset}
-          className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50 px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition-colors"
+          className="inline-flex items-center justify-center text-xs text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg font-bold cursor-pointer transition-colors"
           title="استعادة القيم الرسمية الافتراضية"
         >
-          <RotateCcw className="w-3.5 h-3.5" />
           <span>استعادة الهوية الرسمية</span>
         </button>
       </div>
@@ -120,7 +124,7 @@ export const CompanyProfileForm: React.FC<CompanyProfileFormProps> = ({
             type="text"
             value={profile.phone}
             onChange={(e) => handleChange('phone', e.target.value)}
-            className="w-full h-9.5 px-3 border border-slate-300 rounded-lg text-xs text-slate-800 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-mono"
+            className="w-full h-9.5 px-3 border border-slate-300 rounded-lg text-xs text-slate-800 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 tabular-nums"
           />
         </div>
 
@@ -132,7 +136,7 @@ export const CompanyProfileForm: React.FC<CompanyProfileFormProps> = ({
             type="text"
             value={profile.commercial_reg}
             onChange={(e) => handleChange('commercial_reg', e.target.value)}
-            className="w-full h-9.5 px-3 border border-slate-300 rounded-lg text-xs text-slate-800 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-mono"
+            className="w-full h-9.5 px-3 border border-slate-300 rounded-lg text-xs text-slate-800 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 tabular-nums"
           />
         </div>
 
@@ -144,7 +148,7 @@ export const CompanyProfileForm: React.FC<CompanyProfileFormProps> = ({
             type="text"
             value={profile.tax_id}
             onChange={(e) => handleChange('tax_id', e.target.value)}
-            className="w-full h-9.5 px-3 border border-slate-300 rounded-lg text-xs text-slate-800 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-mono"
+            className="w-full h-9.5 px-3 border border-slate-300 rounded-lg text-xs text-slate-800 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 tabular-nums"
           />
         </div>
       </div>
@@ -171,9 +175,8 @@ export const CompanyProfileForm: React.FC<CompanyProfileFormProps> = ({
           <Button
             type="submit"
             variant="primary"
-            className="bg-[#0a192f] hover:bg-[#0f2b5c] text-white gap-2 text-xs font-bold px-5"
+            className="bg-[#0F766E] hover:bg-[#115E59] text-white text-xs font-bold px-5"
           >
-            <Save className="w-3.5 h-3.5 text-[#d4af37]" />
             <span>حفظ إعدادات الهوية</span>
           </Button>
         </div>

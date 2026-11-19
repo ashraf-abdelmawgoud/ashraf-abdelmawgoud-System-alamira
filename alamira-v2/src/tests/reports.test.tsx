@@ -428,7 +428,7 @@ describe('Phase 4 — Reports & Analytics Domain & Excel Engine', () => {
         expect(screen.getByText('نوع التقرير المطلوب')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('جميع التقارير')).toBeInTheDocument();
+      expect(screen.getByText('المخزون والأرصدة')).toBeInTheDocument();
       expect(screen.getByText('تقارير المبيعات')).toBeInTheDocument();
 
       // Click on Sales category pill

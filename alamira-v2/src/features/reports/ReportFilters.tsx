@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, RotateCcw, Boxes, FileSpreadsheet, AlertTriangle, Truck, Users } from 'lucide-react';
+import { Search, Boxes, Receipt, AlertTriangle, Truck, Users } from 'lucide-react';
 import type { ReportCategory, ReportType } from '../../domain/reportCalculations';
 import { REPORT_METADATA } from '../../services/mockReportService';
 
@@ -30,13 +30,32 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
   onSearchQueryChange,
   onReset,
 }) => {
-  const categoryPills: { id: ReportCategory; label: string; icon: React.ReactNode }[] = [
-    { id: 'all', label: 'جميع التقارير', icon: <Boxes className="w-3.5 h-3.5" /> },
-    { id: 'sales', label: 'تقارير المبيعات', icon: <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" /> },
-    { id: 'stock', label: 'المخزون والأرصدة', icon: <Boxes className="w-3.5 h-3.5 text-blue-600" /> },
-    { id: 'alerts', label: 'النواقص والحد الأدنى', icon: <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> },
-    { id: 'movements', label: 'حركات وتدفق البضاعة', icon: <Truck className="w-3.5 h-3.5 text-amber-600" /> },
-    { id: 'parties', label: 'العملاء والموردين', icon: <Users className="w-3.5 h-3.5 text-purple-600" /> },
+  const categoryTabs: { id: ReportCategory; label: string; icon: (isActive: boolean) => React.ReactNode }[] = [
+    {
+      id: 'stock',
+      label: 'المخزون والأرصدة',
+      icon: (active) => <Boxes className={`w-3.5 h-3.5 ${active ? 'text-white' : 'text-[#11243A]'}`} />,
+    },
+    {
+      id: 'alerts',
+      label: 'النواقص والحد الأدنى',
+      icon: (active) => <AlertTriangle className={`w-3.5 h-3.5 ${active ? 'text-white' : 'text-[#D97706]'}`} />,
+    },
+    {
+      id: 'movements',
+      label: 'حركات وتدفق البضاعة',
+      icon: (active) => <Truck className={`w-3.5 h-3.5 ${active ? 'text-white' : 'text-[#64748B]'}`} />,
+    },
+    {
+      id: 'parties',
+      label: 'العملاء والموردين',
+      icon: (active) => <Users className={`w-3.5 h-3.5 ${active ? 'text-white' : 'text-[#64748B]'}`} />,
+    },
+    {
+      id: 'sales',
+      label: 'تقارير المبيعات',
+      icon: (active) => <Receipt className={`w-3.5 h-3.5 ${active ? 'text-white' : 'text-[#0F766E]'}`} />,
+    },
   ];
 
   const reportOptions = (Object.keys(REPORT_METADATA) as ReportType[]).filter((key) => {
@@ -44,34 +63,42 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
     return REPORT_METADATA[key].category === selectedCategory;
   });
 
+  const handleSelectTab = (id: ReportCategory) => {
+    onCategoryChange(id);
+    // Switch to the first report in this category if current doesn't match
+    const firstInCat = (Object.keys(REPORT_METADATA) as ReportType[]).find(
+      (k) => REPORT_METADATA[k].category === id
+    );
+    if (firstInCat) onReportTypeChange(firstInCat);
+  };
+
   return (
-    <div className="space-y-3.5 bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
-      {/* Category Pills */}
-      <div className="flex flex-wrap gap-1.5 pb-2 border-b border-slate-100">
-        {categoryPills.map((pill) => (
-          <button
-            key={pill.id}
-            type="button"
-            onClick={() => {
-              onCategoryChange(pill.id);
-              // Switch to the first report in this category if current doesn't match
-              if (pill.id !== 'all') {
-                const firstInCat = (Object.keys(REPORT_METADATA) as ReportType[]).find(
-                  (k) => REPORT_METADATA[k].category === pill.id
-                );
-                if (firstInCat) onReportTypeChange(firstInCat);
-              }
-            }}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              selectedCategory === pill.id
-                ? 'bg-[#0a192f] text-white shadow-xs'
-                : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200/60'
-            }`}
-          >
-            {pill.icon}
-            <span>{pill.label}</span>
-          </button>
-        ))}
+    <div className="space-y-3.5 bg-white p-4 rounded-xl border border-[#D9E2EC] shadow-xs">
+      {/* Category Navigation Tabs without 'جميع التقارير' */}
+      <div className="flex flex-wrap items-center gap-2 pb-2.5 border-b border-slate-100">
+        {categoryTabs.map((tab) => {
+          const isSelected = selectedCategory === tab.id;
+          const isSales = tab.id === 'sales';
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => handleSelectTab(tab.id)}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                isSelected
+                  ? isSales
+                    ? 'bg-[#0F766E] text-white shadow-xs border border-[#0F766E]'
+                    : 'bg-[#11243A] text-white shadow-xs border border-[#11243A]'
+                  : isSales
+                    ? 'bg-emerald-50/70 text-[#0F766E] hover:bg-emerald-100 border border-emerald-200'
+                    : 'bg-[#F8FAFC] text-slate-700 hover:bg-slate-100 border border-[#D9E2EC]'
+              }`}
+            >
+              {tab.icon(isSelected)}
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Main Filter Controls */}
@@ -101,7 +128,7 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
             type="date"
             value={dateFrom}
             onChange={(e) => onDateFromChange(e.target.value)}
-            className="w-full h-9.5 px-3 border border-slate-300 rounded-lg text-xs text-slate-800 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-mono"
+            className="w-full h-9.5 px-2.5 border border-slate-300 rounded-lg text-xs text-slate-800 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-mono"
           />
         </div>
 
@@ -112,37 +139,34 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
             type="date"
             value={dateTo}
             onChange={(e) => onDateToChange(e.target.value)}
-            className="w-full h-9.5 px-3 border border-slate-300 rounded-lg text-xs text-slate-800 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-mono"
+            className="w-full h-9.5 px-2.5 border border-slate-300 rounded-lg text-xs text-slate-800 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-mono"
           />
         </div>
 
-        {/* Instant Search */}
+        {/* Search inside report */}
         <div className="md:col-span-3">
-          <label className="block text-xs font-bold text-slate-700 mb-1">
-            تصفية وبحث في الجدول
-          </label>
+          <label className="block text-xs font-bold text-slate-700 mb-1">بحث في السجلات</label>
           <div className="relative">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchQueryChange(e.target.value)}
-              placeholder="بحث في بيانات التقرير..."
+              placeholder="اسم الصنف، العميل، رقم الإذن..."
               className="w-full h-9.5 pr-8 pl-3 border border-slate-300 rounded-lg text-xs text-slate-800 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
             />
-            <Search className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-3 pointer-events-none" />
           </div>
         </div>
 
-        {/* Reset Button */}
+        {/* Reset Filters */}
         <div className="md:col-span-1">
           <button
             type="button"
             onClick={onReset}
-            className="w-full h-9.5 flex items-center justify-center gap-1 border border-slate-300 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+            className="w-full h-9.5 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
             title="إعادة تعيين المرشحات"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">إعادة</span>
+            إعادة
           </button>
         </div>
       </div>

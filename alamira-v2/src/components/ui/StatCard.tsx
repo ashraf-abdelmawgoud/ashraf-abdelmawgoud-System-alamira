@@ -11,7 +11,7 @@ export interface StatCardProps {
     isPositive?: boolean
     label?: string
   }
-  variant?: 'emerald' | 'blue' | 'amber' | 'neutral'
+  variant?: 'emerald' | 'navy' | 'blue' | 'amber' | 'neutral'
   className?: string
 }
 
@@ -26,16 +26,18 @@ export const StatCard: React.FC<StatCardProps> = ({
 }) => {
   const borderIndicatorColors = {
     emerald: 'bg-[#0F766E]',
-    blue: 'bg-[#0284C7]',
+    navy: 'bg-[#11243A]',
+    blue: 'bg-[#11243A]', // Standardized to brand navy palette
     amber: 'bg-[#D97706]',
     neutral: 'bg-[#64748B]',
   }
 
   const iconVariantStyles = {
     emerald: 'bg-emerald-50 text-[#0F766E] border border-emerald-200',
-    blue: 'bg-sky-50 text-[#0284C7] border border-sky-200',
+    navy: 'bg-slate-100 text-[#11243A] border border-slate-200',
+    blue: 'bg-slate-100 text-[#11243A] border border-slate-200', // Standardized to brand navy palette
     amber: 'bg-amber-50 text-[#D97706] border border-amber-200',
-    neutral: 'bg-slate-100 text-[#475569] border border-slate-200',
+    neutral: 'bg-slate-100 text-[#64748B] border border-slate-200',
   }
 
   return (
@@ -55,10 +57,10 @@ export const StatCard: React.FC<StatCardProps> = ({
 
       <div className="flex items-start justify-between gap-3 pr-1.5">
         <div className="flex-1 min-w-0">
-          <p className="text-xs sm:text-[13px] font-semibold text-[#64748B] leading-snug line-clamp-2 min-h-[36px] sm:min-h-[38px] mb-1">
+          <p className="text-xs font-semibold text-[#64748B] leading-snug line-clamp-2 min-h-[36px] sm:min-h-[38px] mb-1">
             {title}
           </p>
-          <h4 className="text-lg sm:text-xl font-bold text-[#11243A] tracking-tight break-words tabular-nums">
+          <h4 className="text-xl sm:text-[22px] font-extrabold text-[#11243A] tracking-tight break-words tabular-nums">
             {value}
           </h4>
         </div>

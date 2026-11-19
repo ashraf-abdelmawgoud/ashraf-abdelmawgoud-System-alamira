@@ -7,7 +7,6 @@ import {
   TableHead,
   TableCell,
   Badge,
-  Button,
 } from '@/components/ui'
 import { Supplier } from '@/types'
 import { formatCurrency, formatNumber } from '@/lib/formatters'
@@ -51,7 +50,7 @@ export const SuppliersTable: React.FC<SuppliersTableProps> = ({
                 {s.phone ? (
                   <a
                     href={`tel:${s.phone}`}
-                    className="text-[#0F766E] hover:underline flex items-center gap-1 font-mono"
+                    className="text-[#0F766E] hover:underline flex items-center gap-1 tabular-nums"
                     dir="ltr"
                   >
                     <Phone className="w-3 h-3 text-slate-400" />
@@ -81,34 +80,34 @@ export const SuppliersTable: React.FC<SuppliersTableProps> = ({
               </TableCell>
 
               <TableCell className="text-center">
-                <div className="flex items-center justify-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                <div className="flex items-center justify-center gap-1.5">
+                  <button
+                    type="button"
                     onClick={() => onView(s)}
                     className="action-btn-pill"
+                    title={`عرض تفاصيل ${s.name}`}
                     aria-label={`عرض تفاصيل ${s.name}`}
                   >
-                    <Eye className="w-3.5 h-3.5 text-[#0F766E]" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                    <Eye className="w-3.5 h-3.5 text-[#11243A]" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => onEdit(s)}
-                    className="action-btn-pill"
+                    className="action-btn-pill action-btn-pill-muted"
+                    title={`تعديل ${s.name}`}
                     aria-label={`تعديل ${s.name}`}
                   >
-                    <Edit3 className="w-3.5 h-3.5 text-[#0284C7]" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                    <Edit3 className="w-3.5 h-3.5 text-[#64748B]" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => onDelete(s)}
-                    className="action-btn-pill"
+                    className="action-btn-pill action-btn-pill-danger"
+                    title={`حذف ${s.name}`}
                     aria-label={`حذف ${s.name}`}
                   >
                     <Trash2 className="w-3.5 h-3.5 text-[#DC2626]" />
-                  </Button>
+                  </button>
                 </div>
               </TableCell>
             </TableRow>

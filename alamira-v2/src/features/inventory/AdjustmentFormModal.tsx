@@ -91,7 +91,7 @@ export const AdjustmentFormModal: React.FC<AdjustmentFormModalProps> = ({
       title="تسوية جرد مخزني فعلي (إثبات عجز أو زيادة)"
       maxWidth="md"
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form noValidate onSubmit={handleSubmit} className="space-y-5">
         {formError && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2">
             <AlertCircle className="w-5 h-5 shrink-0" />
@@ -155,7 +155,7 @@ export const AdjustmentFormModal: React.FC<AdjustmentFormModalProps> = ({
               min="0"
               value={actualQuantity}
               onChange={(e) => setActualQuantity(parseFloat(e.target.value))}
-              className="w-full p-1.5 border border-indigo-300 bg-white rounded-lg text-sm text-center font-black text-indigo-950 focus:ring-2 focus:ring-indigo-500"
+              className="w-full p-1.5 border border-slate-300 bg-white rounded-lg text-sm text-center font-black text-[#11243A] focus:ring-2 focus:ring-[#0F766E]"
               required
             />
           </div>
@@ -198,7 +198,7 @@ export const AdjustmentFormModal: React.FC<AdjustmentFormModalProps> = ({
             type="submit"
             variant="primary"
             disabled={loading}
-            className="bg-indigo-700 hover:bg-indigo-800"
+            className="bg-[#0F766E] hover:bg-[#115E59]"
           >
             {loading ? 'جاري الاعتماد...' : 'اعتماد تسوية الرصيد فوراً'}
           </Button>

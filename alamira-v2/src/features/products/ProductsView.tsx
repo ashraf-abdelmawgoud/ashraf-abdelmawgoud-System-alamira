@@ -5,11 +5,14 @@ import { ProductMobileCard } from './ProductMobileCard'
 import { ProductFormModal } from './ProductFormModal'
 import { ProductDetailsModal } from './ProductDetailsModal'
 import { LoadingState, EmptyState, ConfirmDialog, AlertBanner } from '@/components/ui'
-import { mockDataService } from '@/services/mockDataService'
+import { dataService } from '@/services/dataService'
 import { Product, ProductFormData, ProductStatus } from '@/types'
-import { Package, Plus } from 'lucide-react'
+import { Package } from 'lucide-react'
+import { useAuth } from '@/auth'
 
 export const ProductsView: React.FC = () => {
+  const { currentUser, hasPermission } = useAuth()
+  const canCreate = hasPermission('products:create') || hasPermission('products:manage')
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<string[]>([])
   const [loading, setLoading] = useState<boolean>(true)
@@ -39,12 +42,12 @@ export const ProductsView: React.FC = () => {
     setLoading(true)
     try {
       const [prods, cats] = await Promise.all([
-        mockDataService.getProducts({
+        dataService.getProducts({
           search: searchQuery,
           category: selectedCategory,
           status: selectedStatus,
-        }),
-        mockDataService.getCategories(),
+        }, currentUser.role),
+        dataService.getCategories(),
       ])
       setProducts(prods)
       setCategories(cats)
@@ -54,7 +57,7 @@ export const ProductsView: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [searchQuery, selectedCategory, selectedStatus])
+  }, [searchQuery, selectedCategory, selectedStatus, currentUser.role])
 
   useEffect(() => {
     loadData()
@@ -71,21 +74,27 @@ export const ProductsView: React.FC = () => {
   }
 
   const handleSaveProduct = async (formData: ProductFormData) => {
-    if (editingProduct) {
-      await mockDataService.updateProduct(editingProduct.id, formData)
-      showNotification(`تم تحديث الصنف (${formData.name}) بنجاح في الذاكرة المحلية`)
-    } else {
-      await mockDataService.createProduct(formData)
-      showNotification(`تمت إضافة الصنف الجديد (${formData.name}) بنجاح`)
+    try {
+      if (editingProduct) {
+        await dataService.updateProduct(editingProduct.id, formData, currentUser)
+        showNotification(`تم تحديث الصنف (${formData.name}) بنجاح`)
+      } else {
+        await dataService.createProduct(formData, currentUser)
+        showNotification(`تمت إضافة الصنف الجديد (${formData.name}) بنجاح`)
+      }
+      await loadData()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'فشل حفظ بيانات الصنف'
+      showNotification(msg, 'error')
+      throw err
     }
-    await loadData()
   }
 
   const handleDeleteProduct = async () => {
     if (!deletingProduct) return
     setIsDeleting(true)
     try {
-      await mockDataService.deleteProduct(deletingProduct.id)
+      await dataService.deleteProduct(deletingProduct.id, currentUser)
       showNotification(`تم حذف الصنف (${deletingProduct.name}) بنجاح`, 'info')
       setDeletingProduct(null)
       await loadData()
@@ -146,14 +155,15 @@ export const ProductsView: React.FC = () => {
               : 'لم يتم تسجيل أية أصناف في المخزن حتى الآن.'
           }
           action={
-            <button
-              type="button"
-              onClick={handleOpenAddModal}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>إضافة صنف الآن</span>
-            </button>
+            canCreate ? (
+              <button
+                type="button"
+                onClick={handleOpenAddModal}
+                className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-[#0F766E] rounded-lg hover:bg-[#115E59] transition-colors cursor-pointer"
+              >
+                <span>إضافة صنف الآن</span>
+              </button>
+            ) : undefined
           }
         />
       ) : (

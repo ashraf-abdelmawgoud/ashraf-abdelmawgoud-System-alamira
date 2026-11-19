@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileSpreadsheet, Printer, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
 interface ReportExportActionsProps {
@@ -18,11 +18,11 @@ export const ReportExportActions: React.FC<ReportExportActionsProps> = ({
   isExporting = false,
 }) => {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+    <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-[#D9E2EC] shadow-xs">
       <div className="flex items-center gap-2">
-        <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-        <h2 className="text-sm font-extrabold text-[#0a192f]">{reportTitle}</h2>
-        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
+        <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#0F766E] animate-pulse" />
+        <h2 className="text-sm font-extrabold text-[#11243A]">{reportTitle}</h2>
+        <span className="text-xs px-2 py-0.5 rounded-full bg-[#F8FAFC] text-slate-700 border border-[#D9E2EC] tabular-nums font-bold">
           {rowCount} سجل
         </span>
       </div>
@@ -32,18 +32,15 @@ export const ReportExportActions: React.FC<ReportExportActionsProps> = ({
           variant="secondary"
           onClick={onExportExcel}
           disabled={isExporting || rowCount === 0}
-          className="gap-2 text-[#107c41] border-[#a7f3d0] hover:bg-[#ecfdf5] font-bold text-xs"
+          className="text-[#0F766E] border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 font-bold text-xs"
         >
           {isExporting ? (
             <>
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 ml-1.5" />
               <span>جاري تصدير الإكسل...</span>
             </>
           ) : (
-            <>
-              <FileSpreadsheet className="w-3.5 h-3.5 text-[#107c41]" />
-              <span>تصدير التقرير (Excel)</span>
-            </>
+            <span>تصدير التقرير (Excel)</span>
           )}
         </Button>
 
@@ -51,9 +48,8 @@ export const ReportExportActions: React.FC<ReportExportActionsProps> = ({
           variant="primary"
           onClick={onPrint}
           disabled={rowCount === 0}
-          className="bg-[#0a192f] hover:bg-[#0f2b5c] text-white border-none gap-2 font-bold text-xs"
+          className="bg-[#11243A] hover:bg-[#1e3a5f] text-white font-bold text-xs border border-[#11243A]"
         >
-          <Printer className="w-3.5 h-3.5 text-[#d4af37]" />
           <span>طباعة التقرير</span>
         </Button>
       </div>

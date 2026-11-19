@@ -54,7 +54,7 @@ export const InvoiceMobileCard: React.FC<InvoiceMobileCardProps> = ({
           <span>{invoice.customer_name_snapshot || 'عميل نقدي'}</span>
         </div>
         {invoice.customer_phone_snapshot && (
-          <div className="flex items-center gap-1.5 text-[11px] text-[#64748B] font-mono pr-5" dir="ltr">
+          <div className="flex items-center gap-1.5 text-[11px] text-[#64748B] tabular-nums pr-5" dir="ltr">
             <Phone className="w-3 h-3 text-slate-400" />
             <span>{invoice.customer_phone_snapshot}</span>
           </div>

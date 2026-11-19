@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input, Select, Button } from '@/components/ui'
-import { Search, Plus, Filter, X } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 
 export interface CustomerFiltersProps {
   searchQuery: string
@@ -50,7 +50,6 @@ export const CustomerFilters: React.FC<CustomerFiltersProps> = ({
         <Button
           variant="primary"
           onClick={onAddNew}
-          startIcon={<Plus className="w-4 h-4" />}
           className="shrink-0"
         >
           إضافة عميل جديد
@@ -80,9 +79,8 @@ export const CustomerFilters: React.FC<CustomerFiltersProps> = ({
                 onSearchChange('')
                 onStatusChange('all')
               }}
-              className="text-emerald-700 hover:text-emerald-800 font-semibold flex items-center gap-1 transition-colors"
+              className="text-[#0F766E] hover:text-[#115E59] font-bold transition-colors cursor-pointer"
             >
-              <Filter className="w-3 h-3" />
               <span>إعادة ضبط</span>
             </button>
           )}

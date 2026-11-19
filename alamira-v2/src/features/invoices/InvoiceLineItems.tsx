@@ -1,9 +1,10 @@
 import React from 'react'
-import { Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { Trash2, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { formatCurrency, formatNumber } from '@/lib/formatters'
 import { Product, InvoiceDiscountType } from '@/types'
 import { CalculatedLineItem } from '@/domain/invoiceCalculations'
+import { useAuth } from '@/auth'
 
 export interface LineItemFormState {
   productId: string
@@ -32,6 +33,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
   onRemoveItem,
   isApprovedContext = false,
 }) => {
+  const { canViewExactStock } = useAuth()
   const activeProducts = products.filter((p) => p.is_active)
 
   return (
@@ -51,7 +53,6 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
             onClick={onAddItem}
             className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs"
           >
-            <Plus className="w-3.5 h-3.5 ml-1" />
             إضافة صنف آخر
           </Button>
         )}
@@ -110,7 +111,12 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                         <option value="">-- اختر الصنف من المخزن --</option>
                         {activeProducts.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.sku} - {p.name} (المتاح: {formatNumber(p.current_stock)} {p.unit})
+                            {p.sku} - {p.name}
+                            {canViewExactStock
+                              ? ` (المتاح: ${formatNumber(p.current_stock)} ${p.unit})`
+                              : p.current_stock > 0
+                                ? ' (متوفر)'
+                                : ' (غير متوفر)'}
                           </option>
                         ))}
                       </select>
@@ -120,11 +126,13 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                           {curStock <= 0 ? (
                             <span className="text-rose-700 font-bold flex items-center gap-1">
                               <AlertTriangle className="w-3 h-3 shrink-0" />
-                              رصيد المخزن: 0 (نفد)
+                              {canViewExactStock ? 'رصيد المخزن: 0 (نفد)' : 'غير متوفر بالمخزن'}
                             </span>
                           ) : (
                             <span className="text-emerald-700 font-semibold">
-                              متاح بالمخزن: {formatNumber(curStock)} {prod.unit}
+                              {canViewExactStock
+                                ? `متاح بالمخزن: ${formatNumber(curStock)} ${prod.unit}`
+                                : 'متوفر بالمخزن للطلب والبيع'}
                             </span>
                           )}
                         </div>
@@ -210,7 +218,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                               discountValue: parseFloat(e.target.value) || 0,
                             })
                           }
-                          className="w-16 p-1.5 border border-neutral-300 rounded-lg text-xs text-center font-mono"
+                          className="w-16 p-1.5 border border-neutral-300 rounded-lg text-xs text-center tabular-nums"
                           disabled={row.discountType === 'none' || isApprovedContext}
                         />
                       </div>
@@ -233,10 +241,11 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                           type="button"
                           onClick={() => onRemoveItem(idx)}
                           disabled={items.length <= 1}
-                          className="p-1.5 text-neutral-400 hover:text-rose-600 disabled:opacity-30 cursor-pointer rounded-md transition-colors"
+                          className="action-btn-pill action-btn-pill-danger disabled:opacity-30 disabled:pointer-events-none"
                           title="حذف البند"
+                          aria-label="حذف البند"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5 text-[#DC2626]" />
                         </button>
                       </td>
                     )}

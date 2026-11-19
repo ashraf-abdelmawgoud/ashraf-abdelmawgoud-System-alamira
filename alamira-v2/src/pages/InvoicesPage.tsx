@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { InvoicesView } from '@/features/invoices'
 import { LoadingState } from '@/components/ui'
-import { mockDataService } from '@/services/mockDataService'
+import { dataService } from '@/services/dataService'
 import {
   Customer,
   Product,
   SalesInvoice,
   SalesInvoiceFormData,
 } from '@/types'
+import { useAuth } from '@/auth'
 
 export const InvoicesPage: React.FC = () => {
+  const { currentUser } = useAuth()
   const [loading, setLoading] = useState(true)
   const [notification, setNotification] = useState<{
     message: string
@@ -32,9 +34,9 @@ export const InvoicesPage: React.FC = () => {
     setLoading(true)
     try {
       const [invList, custList, prodList] = await Promise.all([
-        mockDataService.getInvoices(),
-        mockDataService.getCustomers(),
-        mockDataService.getProducts(),
+        dataService.getInvoices(),
+        dataService.getCustomers(),
+        dataService.getProducts(undefined, currentUser.role),
       ])
       setInvoices(invList)
       setCustomers(custList)
@@ -45,7 +47,7 @@ export const InvoicesPage: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [currentUser.role])
 
   useEffect(() => {
     loadAllData()
@@ -53,30 +55,42 @@ export const InvoicesPage: React.FC = () => {
 
   // Handlers
   const handleCreateInvoice = async (formData: SalesInvoiceFormData) => {
-    const created = await mockDataService.createInvoice(formData)
-    showNotification(
-      created.status === 'approved'
-        ? `تم اعتماد فاتورة المبيعات ${created.invoice_number} وخصم المخزون بنجاح`
-        : `تم حفظ مسودة الفاتورة ${created.invoice_number} بنجاح`
-    )
-    await loadAllData()
-    return created
+    try {
+      const created = await dataService.createInvoice(formData, currentUser)
+      showNotification(
+        created.status === 'approved'
+          ? `تم اعتماد فاتورة المبيعات ${created.invoice_number} وخصم المخزون بنجاح`
+          : `تم حفظ مسودة الفاتورة ${created.invoice_number} بنجاح`
+      )
+      await loadAllData()
+      return created
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'فشل إنشاء فاتورة المبيعات'
+      showNotification(msg, 'error')
+      throw err
+    }
   }
 
   const handleUpdateInvoice = async (id: string, formData: SalesInvoiceFormData) => {
-    const updated = await mockDataService.updateDraftInvoice(id, formData)
-    showNotification(
-      updated.status === 'approved'
-        ? `تم اعتماد فاتورة المبيعات ${updated.invoice_number} وخصم المخزون بنجاح`
-        : `تم تحديث مسودة الفاتورة ${updated.invoice_number} بنجاح`
-    )
-    await loadAllData()
-    return updated
+    try {
+      const updated = await dataService.updateDraftInvoice(id, formData, currentUser)
+      showNotification(
+        updated.status === 'approved'
+          ? `تم اعتماد فاتورة المبيعات ${updated.invoice_number} وخصم المخزون بنجاح`
+          : `تم تحديث مسودة الفاتورة ${updated.invoice_number} بنجاح`
+      )
+      await loadAllData()
+      return updated
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'فشل تحديث فاتورة المبيعات'
+      showNotification(msg, 'error')
+      throw err
+    }
   }
 
   const handleApproveInvoice = async (id: string) => {
     try {
-      const approved = await mockDataService.approveInvoice(id)
+      const approved = await dataService.approveInvoice(id, currentUser)
       showNotification(
         `تم اعتماد فاتورة المبيعات ${approved.invoice_number} وخصم الأصناف من المخزون بنجاح`
       )
@@ -91,7 +105,7 @@ export const InvoicesPage: React.FC = () => {
 
   const handleCancelInvoice = async (id: string, reason: string) => {
     try {
-      const cancelled = await mockDataService.cancelApprovedInvoice(id, reason)
+      const cancelled = await dataService.cancelApprovedInvoice(id, reason, currentUser)
       showNotification(
         `تم إلغاء فاتورة المبيعات ${cancelled.invoice_number} واسترجاع الأصناف للمخزون بنجاح`
       )
@@ -106,7 +120,7 @@ export const InvoicesPage: React.FC = () => {
 
   const handleDeleteDraftInvoice = async (id: string) => {
     try {
-      const success = await mockDataService.deleteDraftInvoice(id)
+      const success = await dataService.deleteDraftInvoice(id, currentUser)
       if (success) {
         showNotification('تم حذف مسودة الفاتورة نهائياً بنجاح')
         await loadAllData()
@@ -133,7 +147,7 @@ export const InvoicesPage: React.FC = () => {
               ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
               : notification.type === 'error'
                 ? 'bg-rose-50 text-rose-900 border-rose-200'
-                : 'bg-blue-50 text-blue-900 border-blue-200'
+                : 'bg-slate-100 text-[#11243A] border-slate-300'
           }`}
         >
           <span>{notification.message}</span>

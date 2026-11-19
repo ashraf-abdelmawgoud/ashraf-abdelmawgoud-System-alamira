@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Modal, Button, Input, Select } from '@/components/ui'
 import { Product, ProductFormData } from '@/types'
+import { useAuth } from '@/auth'
 
 export interface ProductFormModalProps {
   isOpen: boolean
@@ -19,6 +20,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   product,
   categories,
 }) => {
+  const { canViewCostPrice } = useAuth()
+  const canViewCost = canViewCostPrice
   const isEditing = Boolean(product)
 
   const [formData, setFormData] = useState<ProductFormData>({
@@ -80,7 +83,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     if (!formData.name.trim()) {
       newErrors.name = 'يرجى إدخال اسم الصنف أو المنتج'
     }
-    if (formData.purchase_price < 0) {
+    if (canViewCost && formData.purchase_price < 0) {
       newErrors.purchase_price = 'سعر الشراء لا يمكن أن يكون سالباً'
     }
     if (formData.selling_price < 0) {
@@ -103,7 +106,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
     setIsSubmitting(true)
     try {
-      await onSave(formData)
+      const sanitizedData: ProductFormData = {
+        ...formData,
+        purchase_price: canViewCost ? formData.purchase_price : 0,
+        opening_quantity: !isEditing ? Number(formData.opening_quantity || 0) : formData.opening_quantity,
+      }
+      await onSave(sanitizedData)
       onClose()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'حدث خطأ أثناء حفظ الصنف'
@@ -151,7 +159,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             error={errors.sku}
             disabled={isSubmitting}
             dir="ltr"
-            className="text-left font-mono"
+            className="text-left tabular-nums font-semibold"
           />
 
           <Input
@@ -195,8 +203,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
         {/* Pricing Fields */}
         <div className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200/80 space-y-3">
-          <h4 className="text-xs font-bold text-neutral-800">بيانات الأسعار وهوامش الربح</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <h4 className="text-xs font-bold text-neutral-800">بيانات الأسعار</h4>
+          <div className={`grid grid-cols-1 ${canViewCost ? 'sm:grid-cols-2' : ''} gap-4`}>
             <Input
               type="number"
               step="any"
@@ -212,25 +220,27 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               helperText="السعر المعتمد في فواتير المبيعات"
             />
 
-            <Input
-              type="number"
-              step="any"
-              min="0"
-              label="سعر الشراء / التكلفة (ج.م)"
-              placeholder="0.00"
-              value={formData.purchase_price}
-              onChange={(e) =>
-                setFormData({ ...formData, purchase_price: parseFloat(e.target.value) || 0 })
-              }
-              error={errors.purchase_price}
-              disabled={isSubmitting}
-              helperText="متوسط تكلفة الشراء من المورد"
-            />
+            {canViewCost && (
+              <Input
+                type="number"
+                step="any"
+                min="0"
+                label="سعر الشراء / التكلفة (ج.م)"
+                placeholder="0.00"
+                value={formData.purchase_price}
+                onChange={(e) =>
+                  setFormData({ ...formData, purchase_price: parseFloat(e.target.value) || 0 })
+                }
+                error={errors.purchase_price}
+                disabled={isSubmitting}
+                helperText="متوسط تكلفة الشراء من المورد"
+              />
+            )}
           </div>
         </div>
 
         {/* Stock Thresholds */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className={`grid grid-cols-1 ${!isEditing ? 'sm:grid-cols-2' : ''} gap-4`}>
           <Input
             type="number"
             min="0"

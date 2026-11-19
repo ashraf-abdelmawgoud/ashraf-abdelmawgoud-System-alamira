@@ -12,7 +12,7 @@ import {
   MovementHistoryView,
 } from '@/features/inventory'
 import { LoadingState } from '@/components/ui'
-import { mockDataService } from '@/services/mockDataService'
+import { dataService } from '@/services/dataService'
 import {
   Product,
   Supplier,
@@ -45,16 +45,19 @@ export const InventoryPage: React.FC = () => {
     setTimeout(() => setNotification(null), 4000)
   }
 
+  const isMock = dataService.isMock()
+
   const loadAllData = useCallback(async () => {
     setLoading(true)
     try {
+      const isMockMode = dataService.isMock()
       const [prods, sups, recs, iss, adjs, movs] = await Promise.all([
-        mockDataService.getProducts(),
-        mockDataService.getSuppliers(),
-        mockDataService.getReceipts(),
-        mockDataService.getIssues(),
-        mockDataService.getAdjustments(),
-        mockDataService.getMovementLogs(),
+        dataService.getProducts(),
+        dataService.getSuppliers(),
+        isMockMode ? dataService.getReceipts() : Promise.resolve([]),
+        isMockMode ? dataService.getIssues() : Promise.resolve([]),
+        isMockMode ? dataService.getAdjustments() : Promise.resolve([]),
+        dataService.getMovementLogs(),
       ])
 
       setProducts(prods)
@@ -78,7 +81,7 @@ export const InventoryPage: React.FC = () => {
   // Handlers for Receipts
   const handleApproveReceipt = async (receiptId: string) => {
     try {
-      const approved = await mockDataService.approveReceipt(receiptId)
+      const approved = await dataService.approveReceipt(receiptId)
       showNotification(`تم اعتماد إذن الاستلام رقم ${approved.receipt_number} وتحديث رصيد المخزون بنجاح`)
       await loadAllData()
     } catch (err: unknown) {
@@ -86,21 +89,27 @@ export const InventoryPage: React.FC = () => {
     }
   }
 
-  const handleCreateReceipt = async (formData: Parameters<typeof mockDataService.createReceipt>[0]) => {
-    const created = await mockDataService.createReceipt(formData)
-    showNotification(
-      created.status === 'approved'
-        ? `تم اعتماد إذن الاستلام ${created.receipt_number} وإيداع الكميات بالمخزن`
-        : `تم حفظ مسودة إذن الاستلام ${created.receipt_number} بنجاح`
-    )
-    await loadAllData()
-    return created
+  const handleCreateReceipt = async (formData: Parameters<typeof dataService.createReceipt>[0]) => {
+    try {
+      const created = await dataService.createReceipt(formData)
+      showNotification(
+        created.status === 'approved'
+          ? `تم اعتماد إذن الاستلام ${created.receipt_number} وإيداع الكميات بالمخزن`
+          : `تم حفظ مسودة إذن الاستلام ${created.receipt_number} بنجاح`
+      )
+      await loadAllData()
+      return created
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'فشل إنشاء إذن الاستلام'
+      showNotification(msg, 'error')
+      throw err
+    }
   }
 
   // Handlers for Issues
   const handleApproveIssue = async (issueId: string) => {
     try {
-      const approved = await mockDataService.approveIssue(issueId)
+      const approved = await dataService.approveIssue(issueId)
       showNotification(`تم اعتماد إذن الصرف رقم ${approved.issue_number} وخصم الكميات من المخزون بنجاح`)
       await loadAllData()
     } catch (err: unknown) {
@@ -108,23 +117,35 @@ export const InventoryPage: React.FC = () => {
     }
   }
 
-  const handleCreateIssue = async (formData: Parameters<typeof mockDataService.createIssue>[0]) => {
-    const created = await mockDataService.createIssue(formData)
-    showNotification(
-      created.status === 'approved'
-        ? `تم اعتماد إذن الصرف ${created.issue_number} وخصم الكميات من المخزون`
-        : `تم حفظ مسودة إذن الصرف ${created.issue_number} بنجاح`
-    )
-    await loadAllData()
-    return created
+  const handleCreateIssue = async (formData: Parameters<typeof dataService.createIssue>[0]) => {
+    try {
+      const created = await dataService.createIssue(formData)
+      showNotification(
+        created.status === 'approved'
+          ? `تم اعتماد إذن الصرف ${created.issue_number} وخصم الكميات من المخزون`
+          : `تم حفظ مسودة إذن الصرف ${created.issue_number} بنجاح`
+      )
+      await loadAllData()
+      return created
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'فشل إنشاء إذن الصرف'
+      showNotification(msg, 'error')
+      throw err
+    }
   }
 
   // Handlers for Adjustments
-  const handleCreateAdjustment = async (formData: Parameters<typeof mockDataService.createAdjustment>[0]) => {
-    const created = await mockDataService.createAdjustment(formData)
-    showNotification(`تم اعتماد تسوية الجرد ${created.adjustment_number} وإعادة ضبط الرصيد الفعلي بنجاح`)
-    await loadAllData()
-    return created
+  const handleCreateAdjustment = async (formData: Parameters<typeof dataService.createAdjustment>[0]) => {
+    try {
+      const created = await dataService.createAdjustment(formData)
+      showNotification(`تم اعتماد تسوية الجرد ${created.adjustment_number} وإعادة ضبط الرصيد الفعلي بنجاح`)
+      await loadAllData()
+      return created
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'فشل إنشاء تسوية الجرد'
+      showNotification(msg, 'error')
+      throw err
+    }
   }
 
   if (loading && products.length === 0) {
@@ -136,11 +157,10 @@ export const InventoryPage: React.FC = () => {
       {/* Toast Notification */}
       {notification && (
         <div
-          className={`p-4 rounded-xl border text-sm font-semibold flex items-center justify-between shadow-md transition-all ${
-            notification.type === 'success'
+          className={`p-4 rounded-xl border text-sm font-semibold flex items-center justify-between shadow-md transition-all ${notification.type === 'success'
               ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
               : 'bg-red-50 text-red-900 border-red-200'
-          }`}
+            }`}
         >
           <span>{notification.message}</span>
           <button
@@ -179,30 +199,51 @@ export const InventoryPage: React.FC = () => {
       )}
 
       {activeTab === 'receipts' && (
-        <ReceiptsList
-          receipts={receipts}
-          products={products}
-          suppliers={suppliers}
-          onApprove={handleApproveReceipt}
-          onCreateReceipt={handleCreateReceipt}
-        />
+        <div className="space-y-4">
+          {!isMock && (
+            <div className="bg-blue-50 border border-blue-200 text-blue-900 px-4 py-3 rounded-lg text-sm">
+              ℹ️ <strong>ملاحظة تشغيلية:</strong> أذون الاستلام المخزنية اليدوية مجدولة للربط السحابي في المرحلة القادمة. يتم تسجيل حركات المخزن وتحديث الأرصدة تلقائياً عبر فواتير المبيعات المعتمدة، ويمكن متابعتها من تبويب &quot;سجل الحركات&quot;.
+            </div>
+          )}
+          <ReceiptsList
+            receipts={receipts}
+            products={products}
+            suppliers={suppliers}
+            onApprove={handleApproveReceipt}
+            onCreateReceipt={handleCreateReceipt}
+          />
+        </div>
       )}
 
       {activeTab === 'issues' && (
-        <IssuesList
-          issues={issues}
-          products={products}
-          onApprove={handleApproveIssue}
-          onCreateIssue={handleCreateIssue}
-        />
+        <div className="space-y-4">
+          {!isMock && (
+            <div className="bg-blue-50 border border-blue-200 text-blue-900 px-4 py-3 rounded-lg text-sm">
+              ℹ️ <strong>ملاحظة تشغيلية:</strong> أذون الصرف المخزنية اليدوية مجدولة للربط السحابي في المرحلة القادمة. يتم صرف المخزون وتحديث الأرصدة تلقائياً عبر فواتير المبيعات المعتمدة، ويمكن متابعتها من تبويب &quot;سجل الحركات&quot;.
+            </div>
+          )}
+          <IssuesList
+            issues={issues}
+            products={products}
+            onApprove={handleApproveIssue}
+            onCreateIssue={handleCreateIssue}
+          />
+        </div>
       )}
 
       {activeTab === 'adjustments' && (
-        <AdjustmentsList
-          adjustments={adjustments}
-          products={products}
-          onCreateAdjustment={handleCreateAdjustment}
-        />
+        <div className="space-y-4">
+          {!isMock && (
+            <div className="bg-blue-50 border border-blue-200 text-blue-900 px-4 py-3 rounded-lg text-sm">
+              ℹ️ <strong>ملاحظة تشغيلية:</strong> تسويات الجرد المخزنية اليدوية مجدولة للربط السحابي في المرحلة القادمة.
+            </div>
+          )}
+          <AdjustmentsList
+            adjustments={adjustments}
+            products={products}
+            onCreateAdjustment={handleCreateAdjustment}
+          />
+        </div>
       )}
 
       {activeTab === 'movements' && (

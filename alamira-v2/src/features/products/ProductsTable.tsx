@@ -7,11 +7,11 @@ import {
   TableHead,
   TableCell,
   Badge,
-  Button,
 } from '@/components/ui'
 import { Product } from '@/types'
 import { formatCurrency, formatNumber } from '@/lib/formatters'
 import { Eye, Edit3, Trash2 } from 'lucide-react'
+import { useAuth } from '@/auth'
 
 export interface ProductsTableProps {
   products: Product[]
@@ -26,6 +26,9 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const { canViewCostPrice, canViewExactStock, hasPermission } = useAuth()
+  const canManageProducts = hasPermission('products:manage')
+
   const getStockBadge = (prod: Product) => {
     const stock = prod.current_stock ?? prod.currentStock ?? 0
     const min = prod.min_stock_level ?? prod.minStockLevel ?? 5
@@ -33,20 +36,20 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
     if (stock <= 0) {
       return (
         <Badge variant="danger" size="sm" dot>
-          نفد (0)
+          {canViewExactStock ? 'نفد (0)' : 'غير متوفر'}
         </Badge>
       )
     }
     if (stock <= min) {
       return (
         <Badge variant="warning" size="sm" dot>
-          منخفض ({formatNumber(stock)})
+          {canViewExactStock ? `منخفض (${formatNumber(stock)})` : 'رصيد منخفض'}
         </Badge>
       )
     }
     return (
       <Badge variant="emerald" size="sm" dot>
-        {formatNumber(stock)} {prod.unit}
+        {canViewExactStock ? `${formatNumber(stock)} ${prod.unit}` : 'متوفر'}
       </Badge>
     )
   }
@@ -60,7 +63,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
             <TableHead>اسم الصنف</TableHead>
             <TableHead>التصنيف</TableHead>
             <TableHead>سعر البيع</TableHead>
-            <TableHead>سعر التكلفة</TableHead>
+            {canViewCostPrice && <TableHead>سعر التكلفة</TableHead>}
             <TableHead>رصيد المخزن</TableHead>
             <TableHead className="text-center w-28">الإجراءات</TableHead>
           </TableRow>
@@ -68,7 +71,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
         <TableBody>
           {products.map((prod) => (
             <TableRow key={prod.id}>
-              <TableCell className="font-mono text-xs font-semibold">
+              <TableCell className="text-xs font-semibold">
                 <span className="inv-number-badge">
                   {prod.sku || prod.code}
                 </span>
@@ -88,41 +91,47 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
                 {formatCurrency(prod.selling_price ?? prod.sellingPrice ?? 0)}
               </TableCell>
 
-              <TableCell className="text-xs text-[#64748B] tabular-nums">
-                {formatCurrency(prod.purchase_price ?? prod.costPrice ?? 0)}
-              </TableCell>
+              {canViewCostPrice && (
+                <TableCell className="text-xs text-[#64748B] tabular-nums">
+                  {formatCurrency(prod.purchase_price ?? prod.costPrice ?? 0)}
+                </TableCell>
+              )}
 
               <TableCell>{getStockBadge(prod)}</TableCell>
 
               <TableCell className="text-center">
-                <div className="flex items-center justify-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                <div className="flex items-center justify-center gap-1.5">
+                  <button
+                    type="button"
                     onClick={() => onView(prod)}
                     className="action-btn-pill"
+                    title={`عرض تفاصيل ${prod.name}`}
                     aria-label={`عرض تفاصيل ${prod.name}`}
                   >
-                    <Eye className="w-3.5 h-3.5 text-[#0F766E]" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onEdit(prod)}
-                    className="action-btn-pill"
-                    aria-label={`تعديل ${prod.name}`}
-                  >
-                    <Edit3 className="w-3.5 h-3.5 text-[#0284C7]" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onDelete(prod)}
-                    className="action-btn-pill"
-                    aria-label={`حذف ${prod.name}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-[#DC2626]" />
-                  </Button>
+                    <Eye className="w-3.5 h-3.5 text-[#11243A]" />
+                  </button>
+                  {canManageProducts && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onEdit(prod)}
+                        className="action-btn-pill action-btn-pill-muted"
+                        title={`تعديل ${prod.name}`}
+                        aria-label={`تعديل ${prod.name}`}
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-[#64748B]" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(prod)}
+                        className="action-btn-pill action-btn-pill-danger"
+                        title={`حذف ${prod.name}`}
+                        aria-label={`حذف ${prod.name}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-[#DC2626]" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </TableCell>
             </TableRow>

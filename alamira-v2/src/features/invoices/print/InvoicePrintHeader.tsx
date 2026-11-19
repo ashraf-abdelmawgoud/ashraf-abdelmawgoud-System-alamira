@@ -34,9 +34,6 @@ export const InvoicePrintHeader: React.FC<InvoicePrintHeaderProps> = ({ data }) 
             </h1>
           )}
         </div>
-        <div className="text-[9pt] font-bold text-[#b45309] mb-0.5">
-          {data.company.subtitle}
-        </div>
         <div className="text-[8.5pt] text-[#334155] leading-snug">
           {data.company.address}
         </div>

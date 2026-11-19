@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import {
   Search,
-  Plus,
   ArrowDownLeft,
   CheckCircle2,
   Clock,
@@ -19,7 +18,7 @@ interface ReceiptsListProps {
   products: Product[]
   suppliers: Supplier[]
   onApprove: (id: string) => Promise<void>
-  onCreateReceipt: (data: Parameters<typeof import('@/services/mockDataService').mockDataService.createReceipt>[0]) => Promise<StockReceipt>
+  onCreateReceipt: (data: Parameters<typeof import('@/services/dataService').dataService.createReceipt>[0]) => Promise<StockReceipt>
   loading?: boolean
 }
 
@@ -80,9 +79,8 @@ export const ReceiptsList: React.FC<ReceiptsListProps> = ({
         <Button
           variant="primary"
           onClick={() => setIsCreateModalOpen(true)}
-          className="bg-emerald-700 hover:bg-emerald-800 shrink-0 w-full sm:w-auto"
+          className="bg-[#0F766E] hover:bg-[#115E59] shrink-0 w-full sm:w-auto"
         >
-          <Plus className="w-4 h-4 ml-1" />
           إذن استلام بضاعة جديد
         </Button>
       </div>
@@ -147,7 +145,7 @@ export const ReceiptsList: React.FC<ReceiptsListProps> = ({
                     <td className="py-2.5 px-3.5 font-semibold text-[#11243A]">
                       {r.supplier_name || 'توريد عام بدون مورد'}
                     </td>
-                    <td className="py-2.5 px-3.5 text-[#64748B] font-mono text-xs" dir="ltr">
+                    <td className="py-2.5 px-3.5 text-[#64748B] text-xs tabular-nums" dir="ltr">
                       {r.supplier_invoice_number || '--'}
                     </td>
                     <td className="py-2.5 px-3.5 text-[#11243A] tabular-nums">
@@ -173,20 +171,24 @@ export const ReceiptsList: React.FC<ReceiptsListProps> = ({
                       {r.approved_by || '--'}
                     </td>
                     <td className="py-2.5 px-3.5 text-center">
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-1.5">
                         <button
+                          type="button"
                           onClick={() => setSelectedReceipt(r)}
                           className="action-btn-pill"
                           title="عرض تفاصيل الإذن"
+                          aria-label="عرض تفاصيل الإذن"
                         >
-                          <Eye className="w-3.5 h-3.5 text-[#0F766E]" />
+                          <Eye className="w-3.5 h-3.5 text-[#11243A]" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handlePrint(r)}
-                          className="action-btn-pill hover:text-slate-800 hover:border-slate-400 hover:bg-slate-50"
+                          className="action-btn-pill action-btn-pill-muted"
                           title="طباعة إذن الاستلام"
+                          aria-label="طباعة إذن الاستلام"
                         >
-                          <Printer className="w-3.5 h-3.5 text-[#b45309]" />
+                          <Printer className="w-3.5 h-3.5 text-[#64748B]" />
                         </button>
                         {!isApproved && (
                           <Button
@@ -194,7 +196,7 @@ export const ReceiptsList: React.FC<ReceiptsListProps> = ({
                             size="sm"
                             disabled={approvingId === r.id}
                             onClick={() => handleApprove(r.id)}
-                            className="bg-[#047857] hover:bg-[#064e3b] text-white text-xs py-1 px-2.5 h-7.5"
+                            className="bg-[#0F766E] hover:bg-[#115E59] text-white text-xs py-1 px-2.5 h-7.5"
                           >
                             {approvingId === r.id ? 'جاري...' : 'اعتماد'}
                           </Button>
@@ -249,7 +251,7 @@ export const ReceiptsList: React.FC<ReceiptsListProps> = ({
                   {r.supplier_invoice_number && (
                     <div className="flex justify-between text-gray-600">
                       <span className="text-xs text-gray-400">فاتورة المورد:</span>
-                      <span className="font-mono text-xs">{r.supplier_invoice_number}</span>
+                      <span className="text-xs tabular-nums">{r.supplier_invoice_number}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-gray-600">
@@ -271,7 +273,6 @@ export const ReceiptsList: React.FC<ReceiptsListProps> = ({
                     onClick={() => setSelectedReceipt(r)}
                     className="flex-1 justify-center text-xs"
                   >
-                    <Eye className="w-3.5 h-3.5 ml-1" />
                     عرض البنود
                   </Button>
                   {!isApproved && (
@@ -392,9 +393,8 @@ export const ReceiptsList: React.FC<ReceiptsListProps> = ({
                 variant="primary"
                 size="sm"
                 onClick={() => handlePrint(selectedReceipt)}
-                className="bg-emerald-700 hover:bg-emerald-800"
+                className="bg-[#0F766E] hover:bg-[#115E59]"
               >
-                <Printer className="w-4 h-4 ml-1" />
                 طباعة الإذن
               </Button>
             </div>

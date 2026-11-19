@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import {
   Search,
-  Plus,
   ClipboardCheck,
   CheckCircle2,
   Printer,
@@ -15,7 +14,7 @@ import { AdjustmentFormModal } from './AdjustmentFormModal'
 interface AdjustmentsListProps {
   adjustments: StockAdjustment[]
   products: Product[]
-  onCreateAdjustment: (data: Parameters<typeof import('@/services/mockDataService').mockDataService.createAdjustment>[0]) => Promise<StockAdjustment>
+  onCreateAdjustment: (data: Parameters<typeof import('@/services/dataService').dataService.createAdjustment>[0]) => Promise<StockAdjustment>
   loading?: boolean
 }
 
@@ -50,7 +49,7 @@ export const AdjustmentsList: React.FC<AdjustmentsListProps> = ({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200">
         <div>
           <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <ClipboardCheck className="w-5 h-5 text-indigo-600" />
+            <ClipboardCheck className="w-5 h-5 text-[#0F766E]" />
             <span>تسويات الجرد المخزني الفعلي</span>
           </h3>
           <p className="text-xs text-gray-500 mt-0.5">
@@ -60,9 +59,8 @@ export const AdjustmentsList: React.FC<AdjustmentsListProps> = ({
         <Button
           variant="primary"
           onClick={() => setIsCreateModalOpen(true)}
-          className="bg-indigo-700 hover:bg-indigo-800 shrink-0 w-full sm:w-auto"
+          className="bg-[#0F766E] hover:bg-[#115E59] shrink-0 w-full sm:w-auto"
         >
-          <Plus className="w-4 h-4 ml-1" />
           تسوية جردية جديدة
         </Button>
       </div>
@@ -120,7 +118,7 @@ export const AdjustmentsList: React.FC<AdjustmentsListProps> = ({
                         <div>
                           <span>{item.product_name}</span>
                           {item.product_sku && (
-                            <span className="block text-xs text-[#64748B] font-mono mt-0.5" dir="ltr">
+                            <span className="block text-xs text-[#64748B] mt-0.5" dir="ltr">
                               [{item.product_sku}]
                             </span>
                           )}
@@ -161,13 +159,17 @@ export const AdjustmentsList: React.FC<AdjustmentsListProps> = ({
                       {a.approved_by || '--'}
                     </td>
                     <td className="py-2.5 px-3.5 text-center">
-                      <button
-                        onClick={() => handlePrint(a)}
-                        className="action-btn-pill hover:text-[#047857] hover:border-[#047857] hover:bg-[#ecfdf5]"
-                        title="طباعة إذن التسوية"
-                      >
-                        <Printer className="w-3.5 h-3.5 text-[#b45309]" />
-                      </button>
+                      <div className="flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={() => handlePrint(a)}
+                          className="action-btn-pill action-btn-pill-muted"
+                          title="طباعة إذن التسوية"
+                          aria-label="طباعة إذن التسوية"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-[#64748B]" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -238,7 +240,6 @@ export const AdjustmentsList: React.FC<AdjustmentsListProps> = ({
                     onClick={() => handlePrint(a)}
                     className="text-xs"
                   >
-                    <Printer className="w-3.5 h-3.5 ml-1" />
                     طباعة المحضر
                   </Button>
                 </div>

@@ -157,7 +157,7 @@ export const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
               المبلغ المستحق على العميل (شامل الخصومات والمصاريف)
             </span>
           </div>
-          <span className="text-2xl font-bold text-[#0F766E] tabular-nums font-mono">
+          <span className="text-2xl font-extrabold text-[#0F766E] tabular-nums">
             {formatCurrency(calculations.finalTotal)}
           </span>
         </div>

@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import {
   Search,
-  Plus,
   ArrowUpRight,
   CheckCircle2,
   Clock,
@@ -18,7 +17,7 @@ interface IssuesListProps {
   issues: StockIssue[]
   products: Product[]
   onApprove: (id: string) => Promise<void>
-  onCreateIssue: (data: Parameters<typeof import('@/services/mockDataService').mockDataService.createIssue>[0]) => Promise<StockIssue>
+  onCreateIssue: (data: Parameters<typeof import('@/services/dataService').dataService.createIssue>[0]) => Promise<StockIssue>
   loading?: boolean
 }
 
@@ -67,7 +66,7 @@ export const IssuesList: React.FC<IssuesListProps> = ({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200">
         <div>
           <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <ArrowUpRight className="w-5 h-5 text-teal-600" />
+            <ArrowUpRight className="w-5 h-5 text-[#0F766E]" />
             <span>أذون صرف البضاعة من المخزن</span>
           </h3>
           <p className="text-xs text-gray-500 mt-0.5">
@@ -77,9 +76,8 @@ export const IssuesList: React.FC<IssuesListProps> = ({
         <Button
           variant="primary"
           onClick={() => setIsCreateModalOpen(true)}
-          className="bg-teal-700 hover:bg-teal-800 shrink-0 w-full sm:w-auto"
+          className="bg-[#0F766E] hover:bg-[#115E59] shrink-0 w-full sm:w-auto"
         >
-          <Plus className="w-4 h-4 ml-1" />
           إذن صرف بضاعة جديد
         </Button>
       </div>
@@ -162,20 +160,24 @@ export const IssuesList: React.FC<IssuesListProps> = ({
                       {i.approved_by || '--'}
                     </td>
                     <td className="py-2.5 px-3.5 text-center">
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-1.5">
                         <button
+                          type="button"
                           onClick={() => setSelectedIssue(i)}
                           className="action-btn-pill"
                           title="عرض تفاصيل الإذن"
+                          aria-label="عرض تفاصيل الإذن"
                         >
-                          <Eye className="w-3.5 h-3.5 text-[#0F766E]" />
+                          <Eye className="w-3.5 h-3.5 text-[#11243A]" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handlePrint(i)}
-                          className="action-btn-pill hover:text-slate-800 hover:border-slate-400 hover:bg-slate-50"
+                          className="action-btn-pill action-btn-pill-muted"
                           title="طباعة إذن الصرف"
+                          aria-label="طباعة إذن الصرف"
                         >
-                          <Printer className="w-3.5 h-3.5 text-[#b45309]" />
+                          <Printer className="w-3.5 h-3.5 text-[#64748B]" />
                         </button>
                         {!isApproved && (
                           <Button
@@ -183,7 +185,7 @@ export const IssuesList: React.FC<IssuesListProps> = ({
                             size="sm"
                             disabled={approvingId === i.id}
                             onClick={() => handleApprove(i.id)}
-                            className="bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 text-xs py-1 px-2.5 h-7.5"
+                            className="bg-emerald-50 text-[#0F766E] hover:bg-emerald-100 border border-emerald-200 text-xs py-1 px-2.5 h-7.5"
                           >
                             {approvingId === i.id ? 'جاري...' : 'اعتماد وخصم'}
                           </Button>
@@ -252,7 +254,6 @@ export const IssuesList: React.FC<IssuesListProps> = ({
                     onClick={() => setSelectedIssue(i)}
                     className="flex-1 justify-center text-xs"
                   >
-                    <Eye className="w-3.5 h-3.5 ml-1" />
                     عرض البنود
                   </Button>
                   {!isApproved && (
@@ -261,7 +262,7 @@ export const IssuesList: React.FC<IssuesListProps> = ({
                       size="sm"
                       disabled={approvingId === i.id}
                       onClick={() => handleApprove(i.id)}
-                      className="flex-1 justify-center bg-teal-700 hover:bg-teal-800 text-xs"
+                      className="flex-1 justify-center bg-[#0F766E] hover:bg-[#115E59] text-xs"
                     >
                       {approvingId === i.id ? 'جاري...' : 'اعتماد وخصم'}
                     </Button>
@@ -309,7 +310,7 @@ export const IssuesList: React.FC<IssuesListProps> = ({
               </div>
               <div>
                 <span className="text-gray-400 block">الحالة:</span>
-                <span className="font-bold text-teal-700">
+                <span className="font-bold text-[#0F766E]">
                   {selectedIssue.status === 'approved' ? 'معتمد ومخصوم' : 'مسودة'}
                 </span>
               </div>
@@ -355,9 +356,8 @@ export const IssuesList: React.FC<IssuesListProps> = ({
                 variant="primary"
                 size="sm"
                 onClick={() => handlePrint(selectedIssue)}
-                className="bg-teal-700 hover:bg-teal-800"
+                className="bg-[#0F766E] hover:bg-[#115E59]"
               >
-                <Printer className="w-4 h-4 ml-1" />
                 طباعة الإذن
               </Button>
             </div>

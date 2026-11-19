@@ -377,6 +377,23 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(result.error).toContain('تعذر العثور على عنصر الفاتورة');
     });
 
+    it('safely restores window.getComputedStyle in try/finally on normal and error execution', async () => {
+      const originalGCS = window.getComputedStyle;
+      const dummyElement = document.createElement('div');
+      dummyElement.innerHTML = '<div style="color: red;">Test</div>';
+      document.body.appendChild(dummyElement);
+
+      // Normal export call
+      await exportInvoicePng(dummyElement, 'INV-SUCCESS-TEST');
+      expect(window.getComputedStyle).toBe(originalGCS);
+
+      // Repeated export call
+      await exportInvoicePng(dummyElement, 'INV-SUCCESS-TEST-2');
+      expect(window.getComputedStyle).toBe(originalGCS);
+
+      document.body.removeChild(dummyElement);
+    });
+
     it('strictly documents 80mm thermal receipt printing as unsupported in V1', () => {
       // V1 audit confirmed no thermal printer template exists in the system
       const isThermalPrintingSupportedInV1 = false;

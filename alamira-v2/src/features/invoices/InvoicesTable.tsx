@@ -32,19 +32,19 @@ export const InvoicesTable: React.FC<InvoicesTableProps> = ({
   return (
     <div className="hidden md:block">
       <Table>
-        <thead className="bg-[#F8FAFC] text-[#475569] text-xs font-semibold border-b border-[#E2E8F0]">
+        <thead className="bg-[#F8FAFC] text-[#064E3B] text-[13px] font-bold border-b border-[#E2E8F0]">
           <tr>
-            <th className="py-2.5 px-3.5 text-right font-semibold text-[#475569]">رقم الفاتورة</th>
-            <th className="py-2.5 px-3.5 text-right font-semibold text-[#475569]">التاريخ</th>
-            <th className="py-2.5 px-3.5 text-right font-semibold text-[#475569]">العميل</th>
-            <th className="py-2.5 px-3.5 text-right font-semibold text-[#475569]">الإجمالي</th>
-            <th className="py-2.5 px-3.5 text-right font-semibold text-[#475569]">الخصم</th>
-            <th className="py-2.5 px-3.5 text-right font-semibold text-[#475569]">الصافي النهائي</th>
-            <th className="py-2.5 px-3.5 text-center font-semibold text-[#475569]">الحالة</th>
-            <th className="py-2.5 px-3.5 text-center font-semibold text-[#475569]">الإجراءات</th>
+            <th className="py-2.5 px-3.5 text-right font-bold text-[#064E3B]">رقم الفاتورة</th>
+            <th className="py-2.5 px-3.5 text-right font-bold text-[#064E3B]">التاريخ</th>
+            <th className="py-2.5 px-3.5 text-right font-bold text-[#064E3B]">العميل</th>
+            <th className="py-2.5 px-3.5 text-right font-bold text-[#064E3B]">الإجمالي</th>
+            <th className="py-2.5 px-3.5 text-right font-bold text-[#064E3B]">الخصم</th>
+            <th className="py-2.5 px-3.5 text-right font-bold text-[#064E3B]">الصافي النهائي</th>
+            <th className="py-2.5 px-3.5 text-center font-bold text-[#064E3B]">الحالة</th>
+            <th className="py-2.5 px-3.5 text-center font-bold text-[#064E3B]">الإجراءات</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#E2E8F0] bg-white text-xs sm:text-sm">
+        <tbody className="divide-y divide-[#E2E8F0] bg-white text-[13px]">
           {invoices.length === 0 ? (
             <tr>
               <td colSpan={8} className="text-center py-12 text-[#64748B]">
@@ -58,7 +58,7 @@ export const InvoicesTable: React.FC<InvoicesTableProps> = ({
                 (Number(inv.item_discounts_amount) || 0) + (Number(inv.invoice_discount_amount) || 0)
               return (
                 <tr key={inv.id} className="hover:bg-[#F8FAFC] transition-colors">
-                  <td className="py-2.5 px-3.5 font-semibold">
+                  <td className="py-2.5 px-3.5 font-bold">
                     <span className="inv-number-badge">
                       {inv.invoice_number}
                     </span>
@@ -69,30 +69,30 @@ export const InvoicesTable: React.FC<InvoicesTableProps> = ({
                       {formatDate(inv.invoice_date)}
                     </span>
                   </td>
-                  <td className="py-2.5 px-3.5 font-semibold text-[#11243A]">
+                  <td className="py-2.5 px-3.5 font-bold text-[#11243A]">
                     <div>
-                      <span>{inv.customer_name_snapshot || 'عميل نقدي'}</span>
+                      <span className="text-[13.5px]">{inv.customer_name_snapshot || 'عميل نقدي'}</span>
                       {inv.customer_phone_snapshot && (
-                        <span className="block text-xs text-[#64748B] font-mono flex items-center gap-1 mt-0.5" dir="ltr">
+                        <span className="block text-xs text-[#64748B] flex items-center gap-1 mt-0.5" dir="ltr">
                           <Phone className="w-3 h-3 text-slate-400" />
                           <span>{inv.customer_phone_snapshot}</span>
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="py-2.5 px-3.5 text-[#11243A] font-medium whitespace-nowrap tabular-nums">
+                  <td className="py-2.5 px-3.5 text-[#11243A] font-semibold text-[13px] whitespace-nowrap tabular-nums">
                     {formatCurrency(inv.gross_amount)}
                   </td>
                   <td className="py-2.5 px-3.5 text-xs whitespace-nowrap tabular-nums">
                     {discountsTotal > 0 ? (
-                      <span className="text-rose-700 font-semibold bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                      <span className="text-rose-700 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
                         -{formatCurrency(discountsTotal)}
                       </span>
                     ) : (
                       <span className="text-slate-400">0.00</span>
                     )}
                   </td>
-                  <td className="py-2.5 px-3.5 font-semibold text-[#0F766E] whitespace-nowrap text-sm sm:text-base tabular-nums">
+                  <td className="py-2.5 px-3.5 font-bold text-[#0F766E] whitespace-nowrap text-[14.5px] tabular-nums">
                     {formatCurrency(inv.final_total)}
                   </td>
                   <td className="py-2.5 px-3.5 text-center">

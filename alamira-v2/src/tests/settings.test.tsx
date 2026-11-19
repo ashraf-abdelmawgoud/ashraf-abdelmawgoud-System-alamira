@@ -86,12 +86,12 @@ describe('Settings & Configuration Feature', () => {
   });
 
   describe('Backup & Snapshot Management', () => {
-    it('displays safety disclaimers about client-side snapshot boundaries', () => {
+    it('displays both Excel and JSON export options with clean status card', () => {
       render(<BackupRestoreSection />);
 
-      expect(screen.getByText(/ضوابط السلامة المعمارية/i)).toBeInTheDocument();
-      expect(screen.getByText(/النسخ الاحتياطي السحابي التلقائي لقاعدة بيانات PostgreSQL/i)).toBeInTheDocument();
-      expect(screen.getByText(/لا تطلب أي مفاتيح سرية/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /تصدير نسخة إكسل \(Excel\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /استخراج نسخة محلية \(JSON\)/i })).toBeInTheDocument();
+      expect(screen.getByText(/توقيت آخر نسخة احتياطية/i)).toBeInTheDocument();
     });
 
     it('generates a downloadable JSON backup snapshot with metadata', async () => {
@@ -166,7 +166,7 @@ describe('Settings & Configuration Feature', () => {
   });
 
   describe('Full Settings View Tabs', () => {
-    it('switches between profile, preferences, backup, and about tabs', async () => {
+    it('switches between profile, preferences, and backup tabs', async () => {
       render(<SettingsView />);
 
       expect(screen.getByText(/بيانات وهوية المنشأة الرسمية/i)).toBeInTheDocument();
@@ -179,12 +179,7 @@ describe('Settings & Configuration Feature', () => {
       // Switch to Backup tab
       const backupTab = screen.getByRole('button', { name: /النسخ الاحتياطي/i });
       fireEvent.click(backupTab);
-      expect(screen.getByText(/تصدير واستخراج بيانات النظام المحلية/i)).toBeInTheDocument();
-
-      // Switch to About tab
-      const aboutTab = screen.getByRole('button', { name: /حول المنظومة V2/i });
-      fireEvent.click(aboutTab);
-      expect(screen.getByText(/الجيل الثاني من نظام إدارة المبيعات/i)).toBeInTheDocument();
+      expect(screen.getByText(/تصدير واستخراج بيانات النظام/i)).toBeInTheDocument();
     });
   });
 });

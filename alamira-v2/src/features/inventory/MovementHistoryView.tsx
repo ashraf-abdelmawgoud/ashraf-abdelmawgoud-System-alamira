@@ -65,8 +65,8 @@ export const MovementHistoryView: React.FC<MovementHistoryViewProps> = ({
         )
       case 'sale':
         return (
-          <Badge variant="default" className="inline-flex items-center gap-1 bg-purple-100 text-purple-800">
-            <FileText className="w-3.5 h-3.5" />
+          <Badge variant="emerald" className="inline-flex items-center gap-1">
+            <FileText className="w-3.5 h-3.5 text-[#0F766E]" />
             بيع بفاتورة
           </Badge>
         )
@@ -165,14 +165,14 @@ export const MovementHistoryView: React.FC<MovementHistoryViewProps> = ({
                     {formatDate(m.created_at)}
                   </td>
                   <td className="p-3.5">{renderTypeBadge(m.movement_type)}</td>
-                  <td className="p-3.5 font-bold text-gray-900 font-mono text-xs">
+                  <td className="p-3.5 font-bold text-gray-900 text-xs tabular-nums">
                     {m.source_doc_number}
                   </td>
                   <td className="p-3.5 font-semibold text-gray-900">
                     <div>
                       <span>{m.product_name}</span>
                       {m.product_sku && (
-                        <span className="block text-xs text-gray-400 font-mono">
+                        <span className="block text-xs text-gray-400">
                           {m.product_sku}
                         </span>
                       )}
@@ -211,7 +211,7 @@ export const MovementHistoryView: React.FC<MovementHistoryViewProps> = ({
             >
               <div className="flex justify-between items-start">
                 <div>
-                  <span className="font-bold text-gray-900 block font-mono text-xs">
+                  <span className="font-bold text-gray-900 block text-xs tabular-nums">
                     {m.source_doc_number}
                   </span>
                   <span className="text-[11px] text-gray-400">{formatDate(m.created_at)}</span>

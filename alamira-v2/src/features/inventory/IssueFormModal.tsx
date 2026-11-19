@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Plus, Trash2, AlertCircle } from 'lucide-react'
+import { Trash2, AlertCircle } from 'lucide-react'
 import { Modal, Button, Input } from '@/components/ui'
 import { formatNumber } from '@/lib/formatters'
 import { Product, StockIssueFormData } from '@/types'
@@ -184,9 +184,8 @@ export const IssueFormModal: React.FC<IssueFormModalProps> = ({
               variant="outline"
               size="sm"
               onClick={addRow}
-              className="text-teal-700 border-teal-300 hover:bg-teal-50"
+              className="text-[#0F766E] border-emerald-300 hover:bg-emerald-50"
             >
-              <Plus className="w-4 h-4 ml-1" />
               إضافة صنف آخر
             </Button>
           </div>
@@ -319,7 +318,7 @@ export const IssueFormModal: React.FC<IssueFormModalProps> = ({
             variant="primary"
             onClick={() => handleSubmit('approve')}
             disabled={loading}
-            className="bg-teal-700 hover:bg-teal-800"
+            className="bg-[#0F766E] hover:bg-[#115E59]"
           >
             {loading ? 'جاري الاعتماد...' : 'اعتماد وخصم من المخزن'}
           </Button>

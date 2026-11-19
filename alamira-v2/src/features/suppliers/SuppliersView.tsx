@@ -5,11 +5,13 @@ import { SupplierMobileCard } from './SupplierMobileCard'
 import { SupplierFormModal } from './SupplierFormModal'
 import { SupplierDetailsModal } from './SupplierDetailsModal'
 import { LoadingState, EmptyState, ConfirmDialog, AlertBanner } from '@/components/ui'
-import { mockDataService } from '@/services/mockDataService'
+import { dataService } from '@/services/dataService'
 import { Supplier, SupplierFormData } from '@/types'
-import { Truck, Plus } from 'lucide-react'
+import { Truck, ShieldAlert } from 'lucide-react'
+import { useAuth } from '@/auth'
 
 export const SuppliersView: React.FC = () => {
+  const { currentUser, canManageSuppliers } = useAuth()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [searchQuery, setSearchQuery] = useState<string>('')
@@ -36,7 +38,7 @@ export const SuppliersView: React.FC = () => {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await mockDataService.getSuppliers({
+      const data = await dataService.getSuppliers({
         search: searchQuery,
         status: selectedStatus,
       })
@@ -64,21 +66,27 @@ export const SuppliersView: React.FC = () => {
   }
 
   const handleSaveSupplier = async (formData: SupplierFormData) => {
-    if (editingSupplier) {
-      await mockDataService.updateSupplier(editingSupplier.id, formData)
-      showNotification(`تم تحديث بيانات المورد (${formData.name}) بنجاح`)
-    } else {
-      await mockDataService.createSupplier(formData)
-      showNotification(`تمت إضافة المورد الجديد (${formData.name}) بنجاح`)
+    try {
+      if (editingSupplier) {
+        await dataService.updateSupplier(editingSupplier.id, formData, currentUser)
+        showNotification(`تم تحديث بيانات المورد (${formData.name}) بنجاح`)
+      } else {
+        await dataService.createSupplier(formData, currentUser)
+        showNotification(`تمت إضافة المورد الجديد (${formData.name}) بنجاح`)
+      }
+      await loadData()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'فشل حفظ بيانات المورد'
+      showNotification(msg, 'error')
+      throw err
     }
-    await loadData()
   }
 
   const handleDeleteSupplier = async () => {
     if (!deletingSupplier) return
     setIsDeleting(true)
     try {
-      await mockDataService.deleteSupplier(deletingSupplier.id)
+      await dataService.deleteSupplier(deletingSupplier.id, currentUser)
       showNotification(`تم حذف المورد (${deletingSupplier.name}) بنجاح`, 'info')
       setDeletingSupplier(null)
       await loadData()
@@ -88,6 +96,22 @@ export const SuppliersView: React.FC = () => {
     } finally {
       setIsDeleting(false)
     }
+  }
+
+  if (!canManageSuppliers) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white border border-red-200 rounded-2xl shadow-sm p-6 text-center space-y-3">
+          <div className="w-12 h-12 mx-auto rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600">
+            <ShieldAlert className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-bold text-neutral-900">غير مصرح بالوصول إلى دليل الموردين</h3>
+          <p className="text-xs text-neutral-500">
+            وفقاً لسياسة الصلاحيات المعتمدة، فإن إدارة الموردين مقصورة على مدير النظام فقط.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -138,9 +162,8 @@ export const SuppliersView: React.FC = () => {
             <button
               type="button"
               onClick={handleOpenAddModal}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
+              className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-[#0F766E] rounded-lg hover:bg-[#115E59] transition-colors cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
               <span>إضافة مورد جديد</span>
             </button>
           }

@@ -25,8 +25,8 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ summary }) =
         title="إجمالي المبيعات"
         value={formatCurrency(summary.totalSales)}
         subtitle="الفواتير المعتمدة بالنظام"
-        icon={<ShoppingBag className="w-5 h-5 text-[#0284C7]" />}
-        variant="blue"
+        icon={<ShoppingBag className="w-5 h-5 text-[#11243A]" />}
+        variant="navy"
       />
 
       {/* 3. Active Products */}
@@ -34,7 +34,7 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ summary }) =
         title="أصناف المخزون"
         value={`${formatNumber(summary.totalProductsCount)} صنف`}
         subtitle="إجمالي الأصناف النشطة"
-        icon={<Package className="w-5 h-5 text-[#475569]" />}
+        icon={<Package className="w-5 h-5 text-[#64748B]" />}
         variant="neutral"
       />
 

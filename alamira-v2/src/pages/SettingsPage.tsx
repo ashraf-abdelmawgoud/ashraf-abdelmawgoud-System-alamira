@@ -25,7 +25,7 @@ export const SettingsPage: React.FC = () => {
               ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
               : notification.type === 'error'
                 ? 'bg-rose-50 text-rose-900 border-rose-200'
-                : 'bg-blue-50 text-blue-900 border-blue-200'
+                : 'bg-slate-100 text-[#11243A] border-slate-300'
           }`}
         >
           <span>{notification.message}</span>

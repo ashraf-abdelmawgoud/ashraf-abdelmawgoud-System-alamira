@@ -1,7 +1,8 @@
 import React from 'react'
 import { Input, Select, Button } from '@/components/ui'
 import { ProductStatus } from '@/types'
-import { Search, Plus, Filter, X } from 'lucide-react'
+import { Search, X } from 'lucide-react'
+import { useAuth } from '@/auth'
 
 export interface ProductFiltersProps {
   searchQuery: string
@@ -26,6 +27,8 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
   onAddNew,
   totalCount,
 }) => {
+  const { hasPermission } = useAuth()
+  const canCreateProduct = hasPermission('products:create') || hasPermission('products:manage')
   const hasActiveFilters = searchQuery !== '' || selectedCategory !== 'all' || selectedStatus !== 'all'
 
   const handleClearFilters = () => {
@@ -60,16 +63,17 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
         </div>
 
         {/* Quick Add Button */}
-        <div className="shrink-0 flex items-center justify-between sm:justify-end gap-2">
-          <Button
-            variant="primary"
-            onClick={onAddNew}
-            startIcon={<Plus className="w-4 h-4" />}
-            className="w-full sm:w-auto"
-          >
-            إضافة صنف جديد
-          </Button>
-        </div>
+        {canCreateProduct && (
+          <div className="shrink-0 flex items-center justify-between sm:justify-end gap-2">
+            <Button
+              variant="primary"
+              onClick={onAddNew}
+              className="w-full sm:w-auto"
+            >
+              إضافة صنف جديد
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Filter Selectors Bar */}
@@ -104,9 +108,8 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
             <button
               type="button"
               onClick={handleClearFilters}
-              className="text-emerald-700 hover:text-emerald-800 font-semibold flex items-center gap-1 transition-colors"
+              className="text-[#0F766E] hover:text-[#115E59] font-bold transition-colors cursor-pointer"
             >
-              <Filter className="w-3 h-3" />
               <span>إعادة ضبط</span>
             </button>
           )}

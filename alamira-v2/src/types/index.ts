@@ -1,5 +1,122 @@
 export type InvoiceStatus = 'draft' | 'approved' | 'cancelled'
 
+export type Role = 'ADMIN' | 'SALES_OPERATOR'
+
+export interface User {
+  id: string
+  name: string
+  username: string
+  email?: string
+  role: Role
+  title: string
+  is_active: boolean
+}
+
+export type AuditOutcome = 'success' | 'denied' | 'failure'
+
+export type AuditActionCategory =
+  | 'all'
+  | 'sales'
+  | 'customers'
+  | 'suppliers'
+  | 'inventory'
+  | 'products'
+  | 'admin'
+  | 'security'
+
+export type AuditAction =
+  // Sales
+  | 'INVOICE_CREATE'
+  | 'INVOICE_DRAFT_UPDATE'
+  | 'INVOICE_DRAFT_DELETE'
+  | 'INVOICE_APPROVE'
+  | 'INVOICE_CANCEL'
+  | 'INVOICE_PRINT'
+  | 'INVOICE_EXPORT_PNG'
+  // Customers
+  | 'CUSTOMER_CREATE'
+  | 'CUSTOMER_UPDATE'
+  | 'CUSTOMER_DELETE'
+  // Suppliers
+  | 'SUPPLIER_CREATE'
+  | 'SUPPLIER_UPDATE'
+  | 'SUPPLIER_DELETE'
+  // Inventory
+  | 'STOCK_RECEIPT_CREATE'
+  | 'STOCK_RECEIPT_APPROVE'
+  | 'STOCK_ISSUE_CREATE'
+  | 'STOCK_ISSUE_APPROVE'
+  | 'STOCK_ADJUSTMENT_CREATE'
+  | 'STOCK_ADJUSTMENT_APPROVE'
+  // Products
+  | 'PRODUCT_CREATE'
+  | 'PRODUCT_UPDATE'
+  | 'PRODUCT_STATUS_CHANGE'
+  | 'PRODUCT_DELETE'
+  // Administration
+  | 'USER_CREATE'
+  | 'USER_UPDATE'
+  | 'USER_STATUS_CHANGE'
+  | 'SETTINGS_UPDATE'
+  | 'BACKUP_EXPORT'
+  | 'BACKUP_EXPORT_JSON'
+  | 'BACKUP_EXPORT_EXCEL'
+  | 'AUDIT_LOG_EXPORT'
+  // Access & Security
+  | 'AUTH_SWITCH_USER'
+  | 'AUTH_SWITCH_ROLE'
+  | 'ACCESS_DENIED'
+
+export type AuditEntityType =
+  | 'sales_invoice'
+  | 'invoice'
+  | 'customer'
+  | 'supplier'
+  | 'product'
+  | 'stock_receipt'
+  | 'stock_issue'
+  | 'stock_adjustment'
+  | 'inventory_movement'
+  | 'user'
+  | 'role'
+  | 'settings'
+  | 'system_settings'
+  | 'backup'
+  | 'system_backup'
+  | 'security_access'
+  | 'audit_log'
+
+export interface AuditLogEntry {
+  id: string
+  action: AuditAction
+  category?: AuditActionCategory
+  entity_type: AuditEntityType
+  entity_id: string
+  entity_name_or_number?: string
+  performed_by: string
+  performed_by_id?: string
+  performed_by_role: Role
+  timestamp: string
+  outcome: AuditOutcome
+  reason?: string
+  details?: Record<string, unknown>
+  before_state?: Record<string, unknown> | null
+  after_state?: Record<string, unknown> | null
+}
+
+export interface AuditLogFilters {
+  search?: string
+  category?: AuditActionCategory
+  action?: AuditAction | 'all'
+  outcome?: AuditOutcome | 'all'
+  user?: string
+  performedBy?: string
+  date_from?: string
+  date_to?: string
+  startDate?: string
+  endDate?: string
+}
+
 export type InventoryMovementType =
   | 'receipt'
   | 'issue'
@@ -10,6 +127,10 @@ export type InventoryMovementType =
 export type InventoryDocumentStatus = 'draft' | 'approved' | 'cancelled'
 
 export type ProductStatus = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock'
+export type CustomerStatus = 'all' | 'active' | 'inactive'
+export type SupplierStatus = 'all' | 'active' | 'inactive'
+
+export type { CompanyProfile, SystemPreferences } from '@/features/settings/types'
 
 export interface Product {
   id: string
@@ -60,6 +181,9 @@ export interface Customer {
   is_active: boolean
   invoices_count: number
   createdAt?: string
+  created_by?: string
+  updated_by?: string
+  updated_at?: string
 }
 
 export interface CustomerFormData {
@@ -68,6 +192,7 @@ export interface CustomerFormData {
   address: string
   notes?: string
   is_active?: boolean
+  created_by?: string
 }
 
 export interface Supplier {
@@ -133,6 +258,9 @@ export interface SalesInvoice {
   notes?: string
   approved_by?: string | null
   approved_at?: string | null
+  cancelled_by?: string | null
+  cancelled_at?: string | null
+  cancel_reason?: string | null
   created_by?: string
   created_at?: string
   updated_at?: string
@@ -218,6 +346,9 @@ export interface StockReceipt {
   status: InventoryDocumentStatus
   approved_by?: string | null
   approved_at?: string | null
+  cancelled_by?: string | null
+  cancelled_at?: string | null
+  cancel_reason?: string | null
   created_by?: string
   created_at: string
   items: StockReceiptItem[]
@@ -264,6 +395,9 @@ export interface StockIssue {
   status: InventoryDocumentStatus
   approved_by?: string | null
   approved_at?: string | null
+  cancelled_by?: string | null
+  cancelled_at?: string | null
+  cancel_reason?: string | null
   created_by?: string
   created_at: string
   items: StockIssueItem[]
@@ -308,6 +442,9 @@ export interface StockAdjustment {
   status: InventoryDocumentStatus
   approved_by?: string | null
   approved_at?: string | null
+  cancelled_by?: string | null
+  cancelled_at?: string | null
+  cancel_reason?: string | null
   created_by?: string
   created_at: string
   items: StockAdjustmentItem[]

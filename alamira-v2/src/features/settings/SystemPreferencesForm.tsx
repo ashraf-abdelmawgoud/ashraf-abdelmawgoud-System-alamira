@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Sliders, Save } from 'lucide-react';
+import { Sliders } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { SystemPreferences, DEFAULT_PREFERENCES } from './types';
+import { dataService } from '@/services/dataService';
 
 interface SystemPreferencesFormProps {
   onSaveNotification?: (msg: string) => void;
@@ -25,6 +26,10 @@ export const SystemPreferencesForm: React.FC<SystemPreferencesFormProps> = ({
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('alamira_system_preferences', JSON.stringify(prefs));
+    dataService.logSettingsUpdate('system_preferences', 'تفضيلات النظام والتشغيل', {
+      defaultPaymentTerms: prefs.defaultPaymentTerms,
+      currencySymbol: prefs.currencySymbol,
+    });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
     if (onSaveNotification) {
@@ -79,7 +84,7 @@ export const SystemPreferencesForm: React.FC<SystemPreferencesFormProps> = ({
                 lowStockThreshold: Number(e.target.value) || 5,
               }))
             }
-            className="w-full h-9.5 px-3 border border-slate-300 rounded-lg text-xs text-slate-900 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-mono"
+            className="w-full h-9.5 px-3 border border-slate-300 rounded-lg text-xs text-slate-900 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 tabular-nums font-semibold"
           />
         </div>
 
@@ -126,9 +131,8 @@ export const SystemPreferencesForm: React.FC<SystemPreferencesFormProps> = ({
           <Button
             type="submit"
             variant="primary"
-            className="bg-[#0a192f] hover:bg-[#0f2b5c] text-white gap-2 text-xs font-bold px-5"
+            className="bg-[#0F766E] hover:bg-[#115E59] text-white text-xs font-bold px-5"
           >
-            <Save className="w-3.5 h-3.5 text-[#d4af37]" />
             <span>حفظ التفضيلات</span>
           </Button>
         </div>

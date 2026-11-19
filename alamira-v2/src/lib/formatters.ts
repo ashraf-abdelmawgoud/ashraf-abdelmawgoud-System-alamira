@@ -30,7 +30,44 @@ export function formatNumber(value: number): string {
 }
 
 /**
- * Formats an ISO date string or Date object into human-readable Arabic date.
+ * Official IANA Timezone for Egypt (encompassing Qena, Cairo, and all governorates).
+ * Automatically accounts for Egyptian Daylight Saving Time (DST) without hardcoded offsets.
+ */
+export const QENA_TIMEZONE = 'Africa/Cairo'
+export const QENA_TIMEZONE_LABEL = 'بتوقيت قنا – مصر'
+
+/**
+ * Formats an ISO date string or Date object specifically into Qena, Egypt time (Africa/Cairo)
+ * with readable Arabic text, Western Arabic numerals, and dynamic DST handling.
+ */
+export function formatQenaDateTime(
+  dateInput: string | Date,
+  options?: { includeSeconds?: boolean }
+): string {
+  if (!dateInput) return '-'
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput
+  if (isNaN(date.getTime())) return '-'
+
+  return new Intl.DateTimeFormat('ar-EG-u-nu-latn', {
+    timeZone: QENA_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(options?.includeSeconds !== false ? { second: '2-digit' } : {}),
+    hour12: true,
+  }).format(date)
+}
+
+/**
+ * Backward-compatible alias for existing Cairo date-time references
+ */
+export const formatCairoDateTime = formatQenaDateTime
+
+/**
+ * Formats an ISO date string or Date object into human-readable Arabic date
+ * adhering to official Qena / Egypt local time.
  */
 export function formatDate(dateInput: string | Date, includeTime: boolean = false): string {
   if (!dateInput) return '-'
@@ -38,6 +75,7 @@ export function formatDate(dateInput: string | Date, includeTime: boolean = fals
   if (isNaN(date.getTime())) return '-'
 
   const options: Intl.DateTimeFormatOptions = {
+    timeZone: QENA_TIMEZONE,
     year: 'numeric',
     month: 'short',
     day: 'numeric',

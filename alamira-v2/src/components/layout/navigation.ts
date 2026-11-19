@@ -4,12 +4,15 @@ import {
   Package,
   Users,
   Truck,
-  FileText,
+  Receipt,
   RotateCcw,
   Boxes,
   BarChart3,
   Settings,
+  ShieldAlert,
 } from 'lucide-react'
+import { Permission, canAccessRoute } from '@/auth/rbac'
+import { User } from '@/types'
 
 export interface NavItem {
   name: string
@@ -18,6 +21,7 @@ export interface NavItem {
   badge?: string
   disabled?: boolean
   disabledReason?: string
+  requiredPermission?: Permission
 }
 
 export const navigationItems: NavItem[] = [
@@ -25,26 +29,31 @@ export const navigationItems: NavItem[] = [
     name: 'لوحة التحكم',
     href: '/',
     icon: LayoutDashboard,
+    requiredPermission: 'route:dashboard',
   },
   {
     name: 'المنتجات والمخزون',
     href: '/products',
     icon: Package,
+    requiredPermission: 'route:products',
   },
   {
     name: 'العملاء',
     href: '/customers',
     icon: Users,
+    requiredPermission: 'route:customers',
   },
   {
     name: 'الموردين',
     href: '/suppliers',
     icon: Truck,
+    requiredPermission: 'route:suppliers',
   },
   {
     name: 'فواتير المبيعات',
     href: '/invoices',
-    icon: FileText,
+    icon: Receipt,
+    requiredPermission: 'route:invoices',
   },
   {
     name: 'مردودات المبيعات',
@@ -57,15 +66,34 @@ export const navigationItems: NavItem[] = [
     name: 'حركات المخزن',
     href: '/inventory',
     icon: Boxes,
+    requiredPermission: 'route:inventory',
   },
   {
     name: 'التقارير والمؤشرات',
     href: '/reports',
     icon: BarChart3,
+    requiredPermission: 'route:reports',
+  },
+  {
+    name: 'سجل النشاط والرقابة',
+    href: '/audit-log',
+    icon: ShieldAlert,
+    requiredPermission: 'route:audit_log',
   },
   {
     name: 'الإعدادات',
     href: '/settings',
     icon: Settings,
+    requiredPermission: 'route:settings',
   },
 ]
+
+/**
+ * Filters navigation items according to user permissions and role
+ */
+export function getNavigationItemsForUser(user: User): NavItem[] {
+  return navigationItems.filter((item) => {
+    if (item.href.startsWith('#')) return true
+    return canAccessRoute(user, item.href)
+  })
+}

@@ -21,14 +21,14 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
     success: 'bg-emerald-50 border-emerald-200 text-emerald-800',
     warning: 'bg-amber-50 border-amber-200 text-amber-800',
     error: 'bg-rose-50 border-rose-200 text-rose-800',
-    info: 'bg-sky-50 border-sky-200 text-sky-800',
+    info: 'bg-slate-100 border-slate-200 text-[#11243A]',
   }
 
   const icons = {
     success: <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />,
     warning: <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />,
     error: <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />,
-    info: <Info className="w-4 h-4 text-sky-600 shrink-0" />,
+    info: <Info className="w-4 h-4 text-[#0F766E] shrink-0" />,
   }
 
   return (

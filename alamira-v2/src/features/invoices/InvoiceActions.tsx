@@ -9,6 +9,7 @@ import {
   Printer,
 } from 'lucide-react'
 import { SalesInvoice } from '@/types'
+import { useAuth } from '@/auth'
 
 interface InvoiceActionsProps {
   invoice: SalesInvoice
@@ -33,9 +34,11 @@ export const InvoiceActions: React.FC<InvoiceActionsProps> = ({
   onPrint,
   isApproving = false,
 }) => {
+  const { canCancelInvoice } = useAuth()
+  const isAllowedToCancel = canCancelInvoice(invoice)
   return (
-    <div className="flex items-center justify-center gap-1">
-      {/* 1. View action always available */}
+    <div className="flex items-center justify-center gap-1.5">
+      {/* 1. View action always available - Neutral Navy */}
       <button
         type="button"
         onClick={() => onView(invoice)}
@@ -43,19 +46,19 @@ export const InvoiceActions: React.FC<InvoiceActionsProps> = ({
         title="معاينة تفاصيل الفاتورة"
         aria-label="معاينة"
       >
-        <Eye className="w-3.5 h-3.5 text-[#0F766E]" />
+        <Eye className="w-3.5 h-3.5 text-[#11243A]" />
       </button>
 
-      {/* 2. Print / PNG Export action always available */}
+      {/* 2. Print / PNG Export action always available - Neutral Slate */}
       {onPrint && (
         <button
           type="button"
           onClick={() => onPrint(invoice)}
-          className="action-btn-pill"
+          className="action-btn-pill action-btn-pill-muted"
           title="طباعة الفاتورة ومعاينة A4 / تصدير PNG"
           aria-label="طباعة وتصدير"
         >
-          <Printer className="w-3.5 h-3.5 text-slate-700" />
+          <Printer className="w-3.5 h-3.5 text-[#64748B]" />
         </button>
       )}
 
@@ -65,26 +68,26 @@ export const InvoiceActions: React.FC<InvoiceActionsProps> = ({
           <button
             type="button"
             onClick={() => onEdit(invoice)}
-            className="action-btn-pill"
+            className="action-btn-pill action-btn-pill-muted"
             title="تعديل المسودة"
             aria-label="تعديل"
           >
-            <Edit3 className="w-3.5 h-3.5 text-[#0284C7]" />
+            <Edit3 className="w-3.5 h-3.5 text-[#64748B]" />
           </button>
           <button
             type="button"
             disabled={isApproving}
             onClick={() => onApprove(invoice)}
-            className="action-btn-pill bg-emerald-50 border-emerald-200 text-[#0F766E] hover:bg-[#0F766E] hover:text-white disabled:opacity-50"
+            className="action-btn-pill action-btn-pill-positive disabled:opacity-50"
             title="اعتماد الفاتورة وخصم المخزون"
             aria-label="اعتماد"
           >
-            <CheckCircle2 className="w-3.5 h-3.5" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-[#0F766E]" />
           </button>
           <button
             type="button"
             onClick={() => onDelete(invoice)}
-            className="action-btn-pill"
+            className="action-btn-pill action-btn-pill-danger"
             title="حذف المسودة نهائياً"
             aria-label="حذف"
           >
@@ -99,21 +102,33 @@ export const InvoiceActions: React.FC<InvoiceActionsProps> = ({
           <button
             type="button"
             onClick={onReturnClick}
-            className="action-btn-pill bg-amber-50 border-amber-200 text-[#D97706] hover:bg-[#D97706] hover:text-white"
+            className="action-btn-pill action-btn-pill-warning"
             title="تسجيل مرتجع مبيعات"
             aria-label="مرتجع"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <RotateCcw className="w-3.5 h-3.5 text-[#D97706]" />
           </button>
-          <button
-            type="button"
-            onClick={() => onCancel(invoice)}
-            className="action-btn-pill"
-            title="إلغاء الفاتورة واسترجاع المخزون"
-            aria-label="إلغاء"
-          >
-            <Ban className="w-3.5 h-3.5 text-[#DC2626]" />
-          </button>
+          {isAllowedToCancel ? (
+            <button
+              type="button"
+              onClick={() => onCancel(invoice)}
+              className="action-btn-pill action-btn-pill-danger"
+              title="إلغاء الفاتورة واسترجاع المخزون"
+              aria-label="إلغاء"
+            >
+              <Ban className="w-3.5 h-3.5 text-[#DC2626]" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="action-btn-pill opacity-40 cursor-not-allowed text-slate-400"
+              title="إلغاء الفاتورة متاح لمنشئ الفاتورة فقط أو مدير النظام"
+              aria-label="إلغاء غير متاح"
+            >
+              <Ban className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+          )}
         </>
       )}
     </div>

@@ -79,13 +79,13 @@ export const ReportDataTable: React.FC<ReportDataTableProps> = ({
         key.toLowerCase().includes('balance')
       ) {
         return (
-          <span className="font-mono font-bold text-slate-900">
+          <span className="font-bold text-slate-900 tabular-nums">
             {val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
             ج.م
           </span>
         );
       }
-      return <span className="font-mono font-bold text-slate-900">{val.toLocaleString('en-US')}</span>;
+      return <span className="font-bold text-slate-900 tabular-nums">{val.toLocaleString('en-US')}</span>;
     }
 
     return String(val);
@@ -116,7 +116,7 @@ export const ReportDataTable: React.FC<ReportDataTableProps> = ({
                 key={idx}
                 className="hover:bg-[#F8FAFC] transition-colors"
               >
-                <td className="py-2.5 px-3 text-center text-[#64748B] font-mono text-[11px] tabular-nums">
+                <td className="py-2.5 px-3 text-center text-[#64748B] text-[11px] tabular-nums">
                   {idx + 1}
                 </td>
                 {columns.map((col) => (
@@ -138,7 +138,7 @@ export const ReportDataTable: React.FC<ReportDataTableProps> = ({
             className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs space-y-2"
           >
             <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-              <span className="text-xs font-mono font-bold text-slate-400">
+              <span className="text-xs font-bold text-slate-400 tabular-nums">
                 #{idx + 1}
               </span>
               {row.status !== undefined && (

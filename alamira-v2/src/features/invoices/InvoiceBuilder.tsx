@@ -1,8 +1,6 @@
 import React, { useState } from 'react'
 import {
   FileText,
-  Save,
-  CheckCircle2,
   AlertCircle,
   ArrowRight,
   Phone,
@@ -267,7 +265,6 @@ export const InvoiceBuilder: React.FC<InvoiceBuilderProps> = ({
             disabled={loading}
             className="bg-amber-100 text-amber-900 hover:bg-amber-200 border-0 text-xs"
           >
-            <Save className="w-4 h-4 ml-1" />
             {loading ? 'جاري الحفظ...' : 'حفظ كمسودة'}
           </Button>
           <Button
@@ -275,9 +272,8 @@ export const InvoiceBuilder: React.FC<InvoiceBuilderProps> = ({
             variant="primary"
             onClick={() => handleSubmit('approve')}
             disabled={loading}
-            className="bg-emerald-700 hover:bg-emerald-800 text-xs"
+            className="bg-[#0F766E] hover:bg-[#115E59] text-xs"
           >
-            <CheckCircle2 className="w-4 h-4 ml-1" />
             {loading ? 'جاري الاعتماد...' : 'اعتماد الفاتورة وخصم المخزون'}
           </Button>
         </div>
@@ -336,7 +332,7 @@ export const InvoiceBuilder: React.FC<InvoiceBuilderProps> = ({
               placeholder="مثال: 01012345678"
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
-              className="pr-9 font-mono"
+              className="pr-9 tabular-nums"
             />
             <Phone className="w-4 h-4 text-neutral-400 absolute right-3 top-3 pointer-events-none" />
           </div>
