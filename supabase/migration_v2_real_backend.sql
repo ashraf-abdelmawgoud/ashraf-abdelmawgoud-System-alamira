@@ -552,6 +552,55 @@ REVOKE SELECT (purchase_price, current_stock) ON public.products FROM authentica
 -- Grant secure view projection to authenticated users
 GRANT SELECT ON public.products_secure_view TO authenticated;
 
+-- Restrict sensitive warehouse & supplier tables to ADMIN only (Prevent cost/stock leaks to SALES_OPERATOR)
+DROP POLICY IF EXISTS "movements_select" ON public.inventory_movements;
+CREATE POLICY "movements_select" ON public.inventory_movements
+    FOR SELECT TO authenticated
+    USING (public.is_admin_user());
+
+DROP POLICY IF EXISTS "suppliers_select" ON public.suppliers;
+CREATE POLICY "suppliers_select" ON public.suppliers
+    FOR SELECT TO authenticated
+    USING (public.is_admin_user());
+
+DROP POLICY IF EXISTS "receipts_select" ON public.stock_receipts;
+CREATE POLICY "receipts_select" ON public.stock_receipts
+    FOR SELECT TO authenticated
+    USING (public.is_admin_user());
+
+DROP POLICY IF EXISTS "receipt_items_select" ON public.stock_receipt_items;
+CREATE POLICY "receipt_items_select" ON public.stock_receipt_items
+    FOR SELECT TO authenticated
+    USING (public.is_admin_user());
+
+DROP POLICY IF EXISTS "issues_select" ON public.stock_issues;
+CREATE POLICY "issues_select" ON public.stock_issues
+    FOR SELECT TO authenticated
+    USING (public.is_admin_user());
+
+DROP POLICY IF EXISTS "issue_items_select" ON public.stock_issue_items;
+CREATE POLICY "issue_items_select" ON public.stock_issue_items
+    FOR SELECT TO authenticated
+    USING (public.is_admin_user());
+
+DROP POLICY IF EXISTS "adjustments_select" ON public.inventory_adjustments;
+CREATE POLICY "adjustments_select" ON public.inventory_adjustments
+    FOR SELECT TO authenticated
+    USING (public.is_admin_user());
+
+DROP POLICY IF EXISTS "adjustment_items_select" ON public.inventory_adjustment_items;
+CREATE POLICY "adjustment_items_select" ON public.inventory_adjustment_items
+    FOR SELECT TO authenticated
+    USING (public.is_admin_user());
+
+-- Authorized users management: only active ADMIN can modify allowlist
+DROP POLICY IF EXISTS "auth_users_admin_write" ON public.authorized_users;
+CREATE POLICY "auth_users_admin_write" ON public.authorized_users
+    FOR ALL TO authenticated
+    USING (public.is_admin_user())
+    WITH CHECK (public.is_admin_user());
+GRANT SELECT, INSERT, UPDATE ON TABLE public.authorized_users TO authenticated;
+
 -- Audit logs permissions: Select restricted to ADMIN via RLS policy; insert allowed for audit logging
 GRANT SELECT, INSERT ON public.audit_logs TO authenticated;
 

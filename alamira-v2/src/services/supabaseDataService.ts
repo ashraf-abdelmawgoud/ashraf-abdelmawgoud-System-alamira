@@ -40,11 +40,20 @@ export const supabaseDataService = {
     const supabase = getSupabaseClient()
     const isSalesOperator = currentUserRole === 'SALES_OPERATOR'
 
-    // If SALES_OPERATOR, query the secure view or mask cost prices
-    const { data, error } = await supabase
-      .from('products')
-      .select('*, categories(name)')
+    // Query products_secure_view (with server-side cost/stock masking) with fallback to products table
+    let { data, error } = await supabase
+      .from('products_secure_view')
+      .select('*')
       .order('name', { ascending: true })
+
+    if (error && (error.code === '42P01' || error.message?.includes('does not exist') || error.message?.includes('relation'))) {
+      const fallback = await supabase
+        .from('products')
+        .select('*, categories(name)')
+        .order('name', { ascending: true })
+      data = fallback.data
+      error = fallback.error
+    }
 
     if (error) {
       throw new Error(`فشل جلب قائمة الأصناف من الخادم: ${error.message}`)
@@ -62,7 +71,7 @@ export const supabaseDataService = {
         sku: row.sku,
         code: row.sku,
         name: row.name,
-        category: row.categories?.name || 'عام',
+        category: row.category_name || row.categories?.name || 'عام',
         unit: row.unit || 'قطعة',
         allows_decimal_quantity: Boolean(row.allows_decimal_quantity),
         purchase_price: purchasePrice,
