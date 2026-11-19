@@ -511,7 +511,8 @@ $$;
 -- ------------------------------------------------------------------------------
 -- 7. SECURE COST-MASKED VIEW FOR PRODUCTS (حجب أسعار الشراء عن مشغلي المبيعات)
 -- ------------------------------------------------------------------------------
-CREATE OR REPLACE VIEW public.products_secure_view AS
+CREATE OR REPLACE VIEW public.products_secure_view 
+WITH (security_barrier = true) AS
 SELECT 
     p.id,
     p.sku,
@@ -543,7 +544,186 @@ FROM public.products p
 LEFT JOIN public.categories c ON c.id = p.category_id;
 
 -- ------------------------------------------------------------------------------
--- 8. SECURITY HARDENING: COLUMN-LEVEL PRIVILEGES & STRICT RPC GRANTS
+-- 8. HARDEN ADMINISTRATIVE RPCs (RESTRICT BACKUP & PRODUCT LIFECYCLE TO ADMIN)
+-- ------------------------------------------------------------------------------
+-- Secure full backup export: strictly restricted to ADMIN
+CREATE OR REPLACE FUNCTION public.export_full_backup()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_user_id UUID;
+    v_data JSONB;
+BEGIN
+    v_user_id := auth.uid();
+    IF v_user_id IS NULL THEN
+        RAISE EXCEPTION 'عملية غير مصرح بها: يجب تسجيل الدخول أولاً';
+    END IF;
+
+    IF NOT public.is_admin_user() THEN
+        RAISE EXCEPTION 'تصدير النسخة الاحتياطية الكاملة مقتصر حصرياً على مديري النظام (ADMIN)';
+    END IF;
+
+    SELECT jsonb_build_object(
+        'system', 'Al Amira Inventory System',
+        'company', 'الأميرة للتوريدات العامة والتجارة',
+        'schema_version', '2.0.0',
+        'exported_at', now(),
+        'exported_by', v_user_id,
+        'data', jsonb_build_object(
+            'categories', (SELECT COALESCE(jsonb_agg(to_jsonb(c)), '[]'::jsonb) FROM public.categories c),
+            'products', (SELECT COALESCE(jsonb_agg(to_jsonb(p)), '[]'::jsonb) FROM public.products p),
+            'customers', (SELECT COALESCE(jsonb_agg(to_jsonb(cu)), '[]'::jsonb) FROM public.customers cu),
+            'suppliers', (SELECT COALESCE(jsonb_agg(to_jsonb(s)), '[]'::jsonb) FROM public.suppliers s),
+            'stock_receipts', (SELECT COALESCE(jsonb_agg(to_jsonb(sr)), '[]'::jsonb) FROM public.stock_receipts sr),
+            'stock_receipt_items', (SELECT COALESCE(jsonb_agg(to_jsonb(sri)), '[]'::jsonb) FROM public.stock_receipt_items sri),
+            'stock_issues', (SELECT COALESCE(jsonb_agg(to_jsonb(si)), '[]'::jsonb) FROM public.stock_issues si),
+            'stock_issue_items', (SELECT COALESCE(jsonb_agg(to_jsonb(sii)), '[]'::jsonb) FROM public.stock_issue_items sii),
+            'sales_invoices', (SELECT COALESCE(jsonb_agg(to_jsonb(inv)), '[]'::jsonb) FROM public.sales_invoices inv),
+            'sales_invoice_items', (SELECT COALESCE(jsonb_agg(to_jsonb(invi)), '[]'::jsonb) FROM public.sales_invoice_items invi),
+            'inventory_adjustments', (SELECT COALESCE(jsonb_agg(to_jsonb(ia)), '[]'::jsonb) FROM public.inventory_adjustments ia),
+            'inventory_adjustment_items', (SELECT COALESCE(jsonb_agg(to_jsonb(iai)), '[]'::jsonb) FROM public.inventory_adjustment_items iai),
+            'inventory_movements', (SELECT COALESCE(jsonb_agg(to_jsonb(im)), '[]'::jsonb) FROM public.inventory_movements im),
+            'application_settings', (SELECT COALESCE(jsonb_agg(to_jsonb(aps)), '[]'::jsonb) FROM public.application_settings aps),
+            'authorized_users', (
+                SELECT COALESCE(
+                    jsonb_agg(
+                        jsonb_build_object(
+                            'user_id', au.user_id,
+                            'email', au.email,
+                            'full_name', au.full_name,
+                            'role', au.role,
+                            'is_active', au.is_active,
+                            'created_at', au.created_at
+                        )
+                    ),
+                    '[]'::jsonb
+                )
+                FROM public.authorized_users au
+            ),
+            'audit_logs', (SELECT COALESCE(jsonb_agg(to_jsonb(al)), '[]'::jsonb) FROM public.audit_logs al)
+        )
+    ) INTO v_data;
+
+    RETURN v_data;
+END;
+$$;
+
+-- Secure delete_product: strictly restricted to ADMIN
+CREATE OR REPLACE FUNCTION public.delete_product(p_product_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_product RECORD;
+    v_has_invoices BOOLEAN;
+    v_has_receipts BOOLEAN;
+    v_has_issues BOOLEAN;
+    v_has_adjustments BOOLEAN;
+    v_has_movements BOOLEAN;
+BEGIN
+    IF NOT public.is_admin_user() THEN
+        RAISE EXCEPTION 'غير مصرح: حذف الأصناف مقتصر حصرياً على مديري النظام (ADMIN)';
+    END IF;
+
+    SELECT * INTO v_product
+    FROM public.products
+    WHERE id = p_product_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'الصنف المطلوب حذفه غير موجود أو تم حذفه مسبقاً.';
+    END IF;
+
+    IF v_product.current_stock IS NOT NULL AND v_product.current_stock <> 0 THEN
+        RAISE EXCEPTION 'لا يمكن حذف الصنف "%" (كود: %) لوجود رصيد مخزون حالي (% %). يرجى تصفية الرصيد أو إيقاف الصنف بدلاً من الحذف.',
+            v_product.name, v_product.sku, v_product.current_stock, v_product.unit;
+    END IF;
+
+    SELECT EXISTS (SELECT 1 FROM public.sales_invoice_items WHERE product_id = p_product_id) INTO v_has_invoices;
+    IF v_has_invoices THEN
+        RAISE EXCEPTION 'لا يمكن حذف الصنف "%" نهائياً لوجود فواتير مبيعات سابقة أو مسودات مرتبطة به. يرجى إيقاف/أرشفة الصنف للحفاظ على سلامة السجلات المالية والضريبية.',
+            v_product.name;
+    END IF;
+
+    SELECT EXISTS (SELECT 1 FROM public.stock_receipt_items WHERE product_id = p_product_id) INTO v_has_receipts;
+    IF v_has_receipts THEN
+        RAISE EXCEPTION 'لا يمكن حذف الصنف "%" لوجود أذون إضافة وتوريد بضاعة مسجلة له بالمخزن. يرجى استخدام ميزة الإيقاف/الأرشفة.',
+            v_product.name;
+    END IF;
+
+    SELECT EXISTS (SELECT 1 FROM public.stock_issue_items WHERE product_id = p_product_id) INTO v_has_issues;
+    IF v_has_issues THEN
+        RAISE EXCEPTION 'لا يمكن حذف الصنف "%" لوجود أذون صرف بضاعة مسجلة له بالمخزن. يرجى استخدام ميزة الإيقاف/الأرشفة.',
+            v_product.name;
+    END IF;
+
+    SELECT EXISTS (SELECT 1 FROM public.inventory_adjustment_items WHERE product_id = p_product_id) INTO v_has_adjustments;
+    IF v_has_adjustments THEN
+        RAISE EXCEPTION 'لا يمكن حذف الصنف "%" لوجود تسويات جرد مسجلة له بالمخزن. يرجى استخدام ميزة الإيقاف/الأرشفة.',
+            v_product.name;
+    END IF;
+
+    SELECT EXISTS (SELECT 1 FROM public.inventory_movements WHERE product_id = p_product_id) INTO v_has_movements;
+    IF v_has_movements THEN
+        RAISE EXCEPTION 'لا يمكن حذف الصنف "%" لوجود حركات مخزنية تاريخية موثقة في سجل الحركات. يرجى إيقاف/أرشفة الصنف بدلاً من الحذف لضمان سلامة التدقيق المخزني.',
+            v_product.name;
+    END IF;
+
+    DELETE FROM public.products WHERE id = p_product_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'message', 'تم حذف الصنف بنجاح نظراً لعدم وجود أي ارتباطات مالية أو مخزنية سابقة له'
+    );
+END;
+$$;
+
+-- Secure set_product_active_status: strictly restricted to ADMIN
+CREATE OR REPLACE FUNCTION public.set_product_active_status(
+    p_product_id UUID,
+    p_is_active BOOLEAN
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_product RECORD;
+BEGIN
+    IF NOT public.is_admin_user() THEN
+        RAISE EXCEPTION 'غير مصرح: تغيير حالة تفعيل/أرشفة الأصناف مقتصر حصرياً على مديري النظام (ADMIN)';
+    END IF;
+
+    SELECT * INTO v_product
+    FROM public.products
+    WHERE id = p_product_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'الصنف المطلوب غير موجود.';
+    END IF;
+
+    UPDATE public.products
+    SET is_active = p_is_active,
+        updated_at = now()
+    WHERE id = p_product_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'message', CASE WHEN p_is_active THEN 'تم تفعيل الصنف بنجاح' ELSE 'تم إيقاف/أرشفة الصنف بنجاح' END,
+        'is_active', p_is_active
+    );
+END;
+$$;
+
+-- ------------------------------------------------------------------------------
+-- 9. SECURITY HARDENING: COLUMN-LEVEL PRIVILEGES & STRICT RPC GRANTS
 -- ------------------------------------------------------------------------------
 -- Revoke direct column SELECT on sensitive product columns from regular authenticated users
 -- Ensures SALES_OPERATOR cannot bypass view masking by querying products table directly
@@ -610,6 +790,15 @@ GRANT EXECUTE ON FUNCTION public.approve_sales_invoice(UUID) TO authenticated;
 
 REVOKE ALL ON FUNCTION public.cancel_sales_invoice(UUID, TEXT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.cancel_sales_invoice(UUID, TEXT) TO authenticated;
+
+REVOKE ALL ON FUNCTION public.export_full_backup() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.export_full_backup() TO authenticated;
+
+REVOKE ALL ON FUNCTION public.delete_product(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.delete_product(UUID) TO authenticated;
+
+REVOKE ALL ON FUNCTION public.set_product_active_status(UUID, BOOLEAN) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.set_product_active_status(UUID, BOOLEAN) TO authenticated;
 
 GRANT EXECUTE ON FUNCTION public.get_current_user_role() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_admin_user() TO authenticated;
