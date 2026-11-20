@@ -72,7 +72,7 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
     {
       id: 'sales',
       label: 'تقارير المبيعات',
-      icon: (active) => <Receipt className={`w-3.5 h-3.5 ${active ? 'text-white' : 'text-emerald-700]'}`} />,
+      icon: (active) => <Receipt className={`w-3.5 h-3.5 ${active ? 'text-white' : 'text-emerald-700'}`} />,
     },
     {
       id: 'inventory',

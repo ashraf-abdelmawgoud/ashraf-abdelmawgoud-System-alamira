@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { BarChart3, AlertCircle, RefreshCw, Info } from 'lucide-react'
 import {
   reportingService,
@@ -45,7 +45,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onNotification }) => {
 
   // Chart data
   const [salesInvoices, setSalesInvoices] = useState<SalesInvoice[]>([])
-  const [topProductBars, setTopProductBars] = useState<BarChartItem[]>([])
 
   // Load auxiliary data for charts
   useEffect(() => {
@@ -55,34 +54,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onNotification }) => {
       .then((invs) => {
         if (!isMounted) return
         setSalesInvoices(invs)
-
-        // Compute top products for chart
-        const productMap = new Map<string, { name: string; sku: string; revenue: number }>()
-        invs
-          .filter((i) => i.status === 'approved')
-          .forEach((inv) => {
-            ;(inv.items || []).forEach((item) => {
-              const ex = productMap.get(item.product_id) || {
-                name: item.product_name_snapshot || 'صنف',
-                sku: item.product_sku_snapshot || '',
-                revenue: 0,
-              }
-              ex.revenue += Number(item.net_amount || item.gross_amount || 0)
-              productMap.set(item.product_id, ex)
-            })
-          })
-
-        const sortedBars: BarChartItem[] = Array.from(productMap.values())
-          .sort((a, b) => b.revenue - a.revenue)
-          .slice(0, 7)
-          .map((p) => ({
-            label: p.name,
-            subLabel: p.sku,
-            value: Math.round(p.revenue),
-            formattedValue: `${Math.round(p.revenue).toLocaleString('en-US')} ج.م`,
-          }))
-
-        setTopProductBars(sortedBars)
       })
       .catch(() => {
         // Non-critical auxiliary chart failure
@@ -92,6 +63,39 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onNotification }) => {
       isMounted = false
     }
   }, [userRole])
+
+  // Compute top products reactively with date filtering
+  const topProductBars = useMemo<BarChartItem[]>(() => {
+    const productMap = new Map<string, { name: string; sku: string; revenue: number }>()
+    salesInvoices
+      .filter((i) => {
+        if (i.status !== 'approved') return false
+        if (dateFrom && i.invoice_date < dateFrom) return false
+        if (dateTo && i.invoice_date > dateTo) return false
+        return true
+      })
+      .forEach((inv) => {
+        ;(inv.items || []).forEach((item) => {
+          const ex = productMap.get(item.product_id) || {
+            name: item.product_name_snapshot || 'صنف',
+            sku: item.product_sku_snapshot || '',
+            revenue: 0,
+          }
+          ex.revenue += Number(item.net_amount || item.gross_amount || 0)
+          productMap.set(item.product_id, ex)
+        })
+      })
+
+    return Array.from(productMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 7)
+      .map((p) => ({
+        label: p.name,
+        subLabel: p.sku,
+        value: Math.round(p.revenue),
+        formattedValue: `${Math.round(p.revenue).toLocaleString('en-US')} ج.م`,
+      }))
+  }, [salesInvoices, dateFrom, dateTo])
 
   // Fetch active report
   const fetchReport = useCallback(async () => {

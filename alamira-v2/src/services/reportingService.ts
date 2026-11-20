@@ -173,11 +173,12 @@ export const reportingService = {
     dateTo?: string
     userRole?: Role
   }): Promise<ReportResult> {
+    const isAdmin = options.userRole === 'ADMIN'
     const [invoices, customers, products, movements] = await Promise.all([
       dataService.getInvoices(),
       dataService.getCustomers(),
       dataService.getProducts(undefined, options.userRole),
-      dataService.getInventoryMovements(),
+      isAdmin ? dataService.getInventoryMovements().catch(() => []) : Promise.resolve([]),
     ])
 
     const approvedInvoices = filterApprovedInvoices(
@@ -202,7 +203,6 @@ export const reportingService = {
     })
 
     // Low stock and out of stock (ADMIN only can see exact counts, others see general products)
-    const isAdmin = options.userRole === 'ADMIN'
     const lowStockCount = isAdmin
       ? products.filter((p) => Number(p.current_stock || 0) <= Number(p.min_stock_level || 0) && Number(p.current_stock || 0) > 0).length
       : 0
