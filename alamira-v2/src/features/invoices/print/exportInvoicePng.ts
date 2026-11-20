@@ -12,7 +12,6 @@
  */
 
 import html2canvas from 'html2canvas';
-import { isMobileDevice } from './printInvoice';
 
 export interface PngExportResult {
   success: boolean;
@@ -86,7 +85,6 @@ export async function exportInvoicePng(
     };
   }
 
-  const isMobile = isMobileDevice();
   const origWindowGCS = window.getComputedStyle;
 
   const wrapWindowGCS = (targetWindow: Window) => {
@@ -112,10 +110,13 @@ export async function exportInvoicePng(
   };
 
   try {
-    // Ensure document fonts have completed loading before rasterization
+    // Ensure document fonts have completed loading before rasterization (with 1.5s timeout guard)
     if (document.fonts && document.fonts.ready) {
       try {
-        await document.fonts.ready;
+        await Promise.race([
+          document.fonts.ready,
+          new Promise((resolve) => setTimeout(resolve, 1500)),
+        ]);
       } catch (fontErr) {
         console.warn('Font readiness check skipped or timed out:', fontErr);
       }
@@ -124,8 +125,8 @@ export async function exportInvoicePng(
     // Intercept computed styles to convert modern CSS oklch() to sRGB for html2canvas
     wrapWindowGCS(window);
 
-    // On mobile, use 1.5 scale to avoid canvas memory exhaustion; on desktop use 2x retina
-    const renderScale = isMobile ? 1.5 : 2;
+    // Universal 2x retina scale for pixel-perfect resolution on both mobile and desktop
+    const renderScale = 2;
 
     const canvas = await html2canvas(element, {
       scale: renderScale,
@@ -141,10 +142,39 @@ export async function exportInvoicePng(
           wrapWindowGCS(clonedDoc.defaultView);
         }
 
-        // Ensure cloned invoice sheet has natural scale and uncorrupted Arabic typography
+        // CRITICAL ROOT-CAUSE REPAIR FOR MOBILE CHROME ANDROID:
+        // On mobile devices, the invoice preview is wrapped in a scaled container (transform: scale(effectiveScale)),
+        // absolute positioning (left: 50%, margin-left: -397px), and constrained wrapper dimensions.
+        // In the cloned document, reset all ancestor containers to static 794px A4 layout so that
+        // html2canvas parses bounds at 794px x naturalHeight instead of scaled/shifted dimensions.
         const clonedSheet = clonedDoc.querySelector('.invoice-sheet') as HTMLElement | null;
         if (clonedSheet) {
+          let ancestor = clonedSheet.parentElement;
+          while (ancestor && ancestor !== clonedDoc.body) {
+            ancestor.style.transform = 'none';
+            ancestor.style.position = 'static';
+            ancestor.style.left = 'auto';
+            ancestor.style.top = 'auto';
+            ancestor.style.margin = '0 auto';
+            ancestor.style.padding = '0';
+            ancestor.style.width = '794px';
+            ancestor.style.minWidth = '794px';
+            ancestor.style.maxWidth = '794px';
+            ancestor.style.height = 'auto';
+            ancestor.style.minHeight = '0';
+            ancestor.style.overflow = 'visible';
+            ancestor = ancestor.parentElement;
+          }
+
           clonedSheet.style.transform = 'none';
+          clonedSheet.style.position = 'relative';
+          clonedSheet.style.left = 'auto';
+          clonedSheet.style.top = 'auto';
+          clonedSheet.style.margin = '0 auto';
+          clonedSheet.style.width = '794px';
+          clonedSheet.style.minWidth = '794px';
+          clonedSheet.style.maxWidth = '794px';
+          clonedSheet.style.boxShadow = 'none';
           clonedSheet.style.letterSpacing = 'normal';
           clonedSheet.style.direction = 'rtl';
           clonedSheet.style.textAlign = 'right';
@@ -200,7 +230,11 @@ export async function exportInvoicePng(
         fallbackLink.href = fallbackDataUrl;
         fallbackLink.style.display = 'none';
         document.body.appendChild(fallbackLink);
-        fallbackLink.click();
+        try {
+          fallbackLink.click();
+        } catch {
+          fallbackLink.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+        }
         document.body.removeChild(fallbackLink);
       }
 
@@ -230,14 +264,18 @@ export async function exportInvoicePng(
     document.body.appendChild(link);
 
     try {
-      const clickEvent = new MouseEvent('click', {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-      });
-      link.dispatchEvent(clickEvent);
-    } catch {
       link.click();
+    } catch {
+      try {
+        const clickEvent = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+        });
+        link.dispatchEvent(clickEvent);
+      } catch (clickErr) {
+        console.warn('Link click and dispatchEvent both failed:', clickErr);
+      }
     }
 
     // Keep Blob URL alive for 2 minutes to allow mobile downloads to complete in background
@@ -265,6 +303,7 @@ export async function exportInvoicePng(
       error: `فشل تصدير الفاتورة كصورة: ${errorMsg}`,
     };
   } finally {
+    // Restore original window.getComputedStyle to prevent memory leaks and performance drag
     window.getComputedStyle = origWindowGCS;
   }
 }

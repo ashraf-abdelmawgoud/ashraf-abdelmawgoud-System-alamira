@@ -820,5 +820,39 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(screen.queryByText('مشاركة عبر التطبيقات')).not.toBeInTheDocument();
       expect(screen.queryByText('تنزيل الصورة')).not.toBeInTheDocument();
     });
+
+    it('H. Mobile Scaled Wrapper Resilience: Successfully exports when element is inside scaled modal wrapper', async () => {
+      setUserAgent('Mozilla/5.0 (Linux; Android 14; SM-G998B) AppleWebKit/537.36 Mobile Safari/537.36');
+
+      // Create a scaled preview hierarchy mimicking mobile preview modal
+      const wrapper = document.createElement('div');
+      wrapper.className = 'invoice-print-modal-scale-wrapper';
+      wrapper.style.width = '350px';
+      wrapper.style.height = '500px';
+
+      const innerScale = document.createElement('div');
+      innerScale.className = 'invoice-print-modal-inner-scale';
+      innerScale.style.transform = 'scale(0.44)';
+      innerScale.style.position = 'absolute';
+      innerScale.style.left = '50%';
+      innerScale.style.marginLeft = '-397px';
+
+      const invoiceSheet = document.createElement('div');
+      invoiceSheet.className = 'invoice-sheet';
+      invoiceSheet.innerHTML = '<h1>فاتورة اختبار التوافق مع الهواتف المحمولة</h1>';
+
+      innerScale.appendChild(invoiceSheet);
+      wrapper.appendChild(innerScale);
+      document.body.appendChild(wrapper);
+
+      try {
+        const result = await exportInvoicePng(invoiceSheet, 'INV-MOBILE-SCALE-01');
+        expect(result.success).toBe(true);
+        expect(result.method).toBe('download');
+        expect(result.fileName).toBe('فاتورة_الأميرة_INV-MOBILE-SCALE-01.png');
+      } finally {
+        document.body.removeChild(wrapper);
+      }
+    });
   });
 });
