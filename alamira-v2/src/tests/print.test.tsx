@@ -161,7 +161,7 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
     it('maps official company information with 100% parity', () => {
       const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
       expect(model.company.name).toBe(OFFICIAL_COMPANY_INFO.name);
-      expect(model.company.name).toBe('الأميرة للتوريدات والتجارة العامة');
+      expect(model.company.name).toBe('الأميرة للتوريدات العامة والتجارة');
       expect(model.company.address).toBe('قنا - م الوقف');
       expect(model.company.logoUrl).toBe('/logo.png');
       expect(model.company.branches.qena.address).toBe('قنا - م الوقف');
@@ -212,7 +212,7 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(screen.queryByText('فاتورة مبيعات')).not.toBeInTheDocument();
       expect(screen.getByText('INV-20261117-001')).toBeInTheDocument();
       expect(screen.getByText('2026-11-17')).toBeInTheDocument();
-      expect(screen.getByText('الأميرة للتوريدات والتجارة العامة')).toBeInTheDocument();
+      expect(screen.getByText('الأميرة للتوريدات العامة والتجارة')).toBeInTheDocument();
       const logo = screen.getByRole('img');
       expect(logo).toHaveAttribute('src', '/logo.png');
     });
@@ -625,7 +625,7 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(screen.getByText('01020680007')).toBeInTheDocument();
 
       // Subtle company identity line
-      expect(screen.getByText(/الأميرة للتوريدات والتجارة العامة — نسعد بخدمتكم دائماً/)).toBeInTheDocument();
+      expect(screen.getByText(/الأميرة للتوريدات العامة والتجارة — نسعد بخدمتكم دائماً/)).toBeInTheDocument();
     });
   });
 

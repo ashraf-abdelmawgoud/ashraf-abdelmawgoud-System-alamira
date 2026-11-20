@@ -47,7 +47,7 @@ export const InvoicePrintHeader: React.FC<InvoicePrintHeaderProps> = ({ data }) 
 
         <div className="doc-meta text-[8.5pt] font-bold text-[#334155] space-y-1.5 pt-0.5">
           <div className="flex justify-between items-center gap-2">
-            <span className="text-[#64748b]">رقم الفاتورة:</span>
+            <span className="text-[#64748b]">رقم المستند:</span>
             <strong className="text-[#0a192f] font-mono text-[9pt]" dir="ltr">
               {data.invoice.invoiceNumber}
             </strong>

@@ -64,7 +64,7 @@ export interface InvoicePrintModel {
 }
 
 export const OFFICIAL_COMPANY_INFO: InvoicePrintCompanyModel = {
-  name: 'الأميرة للتوريدات والتجارة العامة',
+  name: 'الأميرة للتوريدات العامة والتجارة',
   subtitle: 'توريدات عمومية وتجارة - استيراد وتصدير وتوكيلات',
   address: 'قنا - م الوقف',
   logoUrl: '/logo.png',

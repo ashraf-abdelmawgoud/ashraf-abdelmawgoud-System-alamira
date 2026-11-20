@@ -59,34 +59,34 @@ export const InvoicePrintFooter: React.FC<InvoicePrintFooterProps> = ({ data }) 
 
       {/* Redesigned Compact Official Branches & Contact Strip */}
       <div className="print-branches-footer mt-2.5 pt-2 border-t-[1.5px] border-[#0a192f] bg-[#f8fafc] px-3 py-1.5 rounded-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[8pt] text-[#334155] leading-normal">
+        <div className="flex flex-row justify-between items-center gap-2 text-[7.8pt] text-[#334155] leading-normal whitespace-nowrap">
           {/* QENA BRANCH (Right Column in RTL) */}
-          <div className="text-right flex items-center justify-start gap-1.5 flex-wrap">
+          <div className="text-right flex items-center justify-start gap-1.5 whitespace-nowrap">
             <span className="w-1.5 h-1.5 rounded-full bg-[#c59b27] shrink-0" />
             <strong className="text-[#0a192f] font-extrabold">{branches.qena.name}:</strong>
             <span>{branches.qena.address}</span>
             <span className="text-[#cbd5e1] font-sans mx-0.5">|</span>
-            <div className="inline-flex items-center gap-1.5 font-mono font-bold text-[#0a192f]" dir="ltr">
+            <div className="inline-flex items-center gap-1.5 font-mono font-bold text-[#0a192f]" dir="rtl">
               {branches.qena.phones.map((phone, idx) => (
                 <React.Fragment key={phone}>
                   {idx > 0 && <span className="text-[#94a3b8] font-sans">-</span>}
-                  <span className="select-all">{phone}</span>
+                  <span className="select-all" dir="ltr">{phone}</span>
                 </React.Fragment>
               ))}
             </div>
           </div>
 
           {/* HURGHADA BRANCH (Left Column in RTL) */}
-          <div className="text-right sm:text-left flex items-center sm:justify-end gap-1.5 flex-wrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#c59b27] shrink-0 sm:order-last" />
+          <div className="text-left flex items-center justify-end gap-1.5 whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#c59b27] shrink-0" />
             <strong className="text-[#0a192f] font-extrabold">{branches.hurghada.name}:</strong>
             <span>{branches.hurghada.address}</span>
             <span className="text-[#cbd5e1] font-sans mx-0.5">|</span>
-            <div className="inline-flex items-center gap-1.5 font-mono font-bold text-[#0a192f]" dir="ltr">
+            <div className="inline-flex items-center gap-1.5 font-mono font-bold text-[#0a192f]" dir="rtl">
               {branches.hurghada.phones.map((phone, idx) => (
                 <React.Fragment key={phone}>
                   {idx > 0 && <span className="text-[#94a3b8] font-sans">-</span>}
-                  <span className="select-all">{phone}</span>
+                  <span className="select-all" dir="ltr">{phone}</span>
                 </React.Fragment>
               ))}
             </div>
