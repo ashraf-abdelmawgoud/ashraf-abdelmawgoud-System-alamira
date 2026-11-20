@@ -22,7 +22,9 @@ export const InvoicePrintCustomerInfo: React.FC<InvoicePrintCustomerInfoProps> =
         {data.customer.phone && (
           <div className="flex items-center gap-1">
             <span className="text-[#64748b]">الهاتف:</span>
-            <strong className="text-[#0f172a] font-mono">{data.customer.phone}</strong>
+            <strong className="text-[#0f172a] font-mono" dir="ltr">
+              {data.customer.phone}
+            </strong>
           </div>
         )}
         {data.customer.address && (
@@ -43,17 +45,9 @@ export const InvoicePrintCustomerInfo: React.FC<InvoicePrintCustomerInfoProps> =
           <strong className="text-[#0f172a]">{data.invoice.paymentTermLabel}</strong>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-[#64748b]">حالة المستند:</span>
-          <strong
-            className={
-              data.invoice.status === 'approved'
-                ? 'text-emerald-700 font-bold'
-                : data.invoice.status === 'cancelled'
-                  ? 'text-rose-700 font-bold'
-                  : 'text-amber-700 font-bold'
-            }
-          >
-            {data.invoice.statusLabel}
+          <span className="text-[#64748b]">نوع المستند:</span>
+          <strong className="text-[#0a192f] font-bold">
+            {data.invoice.documentTypeLabel || 'بيان الأسعار'}
           </strong>
         </div>
         <div className="flex items-center justify-between">

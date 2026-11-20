@@ -1,12 +1,6 @@
-/**
- * Invoice Print Data Mapper
- * Transforms a SalesInvoice entity into a display-ready, validated model for printing and PNG export.
- */
-
 import type { SalesInvoice, Customer } from '../../../types';
 import { round2 } from '../../../domain/invoiceCalculations';
-import { formatQuantity } from '../../../lib/formatters';
-import { tafqeetArabic } from '../../../utils/tafqeet';
+import { tafqeetArabic } from '../../../lib/tafqeet';
 
 export interface InvoicePrintItemModel {
   index: number;
@@ -21,20 +15,33 @@ export interface InvoicePrintItemModel {
   netAmount: number;
 }
 
-export interface InvoicePrintModel {
-  company: {
-    name: string;
-    subtitle: string;
-    address: string;
-    logoUrl: string;
+export interface InvoicePrintBranchInfo {
+  name: string;
+  address: string;
+  phones: string[];
+}
+
+export interface InvoicePrintCompanyModel {
+  name: string;
+  subtitle: string;
+  address: string;
+  logoUrl: string;
+  branches: {
+    qena: InvoicePrintBranchInfo;
+    hurghada: InvoicePrintBranchInfo;
   };
+}
+
+export interface InvoicePrintModel {
+  company: InvoicePrintCompanyModel;
   invoice: {
     id: string;
     invoiceNumber: string;
     invoiceDate: string;
     paymentTermLabel: string;
-    status: 'draft' | 'approved' | 'cancelled';
+    status: SalesInvoice['status'];
     statusLabel: string;
+    documentTypeLabel: string;
     creatorLabel: string;
     notes: string | null;
   };
@@ -56,11 +63,23 @@ export interface InvoicePrintModel {
   };
 }
 
-export const OFFICIAL_COMPANY_INFO = {
-  name: 'الأميرة للتوريدات العامة والتجارة',
+export const OFFICIAL_COMPANY_INFO: InvoicePrintCompanyModel = {
+  name: 'الأميرة للتوريدات والتجارة العامة',
   subtitle: 'توريدات عمومية وتجارة - استيراد وتصدير وتوكيلات',
-  address: 'قنا – الوقف – بجوار مركز شباب عزبة علام',
+  address: 'قنا - بجوار مركز شباب عزبة علام',
   logoUrl: '/logo.png',
+  branches: {
+    qena: {
+      name: 'فرع قنا',
+      address: 'قنا - بجوار مركز شباب عزبة علام',
+      phones: ['01008949310', '01001239995'],
+    },
+    hurghada: {
+      name: 'فرع الغردقة',
+      address: 'الغردقة - شيراتون',
+      phones: ['01001239995', '01020680007'],
+    },
+  },
 };
 
 export function mapInvoiceToPrintModel(
@@ -114,6 +133,7 @@ export function mapInvoiceToPrintModel(
       paymentTermLabel,
       status: invoice.status,
       statusLabel,
+      documentTypeLabel: 'بيان الأسعار',
       creatorLabel: 'المسؤول التجاري المختص',
       notes: invoice.notes && invoice.notes.trim() ? invoice.notes.trim() : null,
     },
@@ -134,4 +154,9 @@ export function mapInvoiceToPrintModel(
       tafqeetText,
     },
   };
+}
+
+function formatQuantity(qty: number): string {
+  const rounded = round2(qty);
+  return rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toString();
 }

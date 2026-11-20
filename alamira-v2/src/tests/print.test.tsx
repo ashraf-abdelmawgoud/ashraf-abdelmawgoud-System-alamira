@@ -148,9 +148,13 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
     it('maps official company information with 100% parity', () => {
       const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
       expect(model.company.name).toBe(OFFICIAL_COMPANY_INFO.name);
-      expect(model.company.name).toBe('الأميرة للتوريدات العامة والتجارة');
-      expect(model.company.address).toBe('قنا – الوقف – بجوار مركز شباب عزبة علام');
+      expect(model.company.name).toBe('الأميرة للتوريدات والتجارة العامة');
+      expect(model.company.address).toBe('قنا - بجوار مركز شباب عزبة علام');
       expect(model.company.logoUrl).toBe('/logo.png');
+      expect(model.company.branches.qena.address).toBe('قنا - بجوار مركز شباب عزبة علام');
+      expect(model.company.branches.hurghada.address).toBe('الغردقة - شيراتون');
+      expect(model.company.branches.qena.phones).toEqual(['01008949310', '01001239995']);
+      expect(model.company.branches.hurghada.phones).toEqual(['01001239995', '01020680007']);
     });
 
     it('maps customer details and transaction metadata correctly', () => {
@@ -188,14 +192,14 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
   });
 
   describe('3. Template Component Rendering (Visual & Structural Fidelity)', () => {
-    it('renders Header with official logo, company name, address, and document badge', () => {
+    it('renders Header with official logo, company name, and document box without "فاتورة مبيعات"', () => {
       const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
       render(<InvoicePrintHeader data={model} />);
 
-      expect(screen.getByText('فاتورة مبيعات')).toBeInTheDocument();
+      expect(screen.queryByText('فاتورة مبيعات')).not.toBeInTheDocument();
       expect(screen.getByText('INV-20261117-001')).toBeInTheDocument();
       expect(screen.getByText('2026-11-17')).toBeInTheDocument();
-      expect(screen.getByText(OFFICIAL_COMPANY_INFO.address)).toBeInTheDocument();
+      expect(screen.getByText('الأميرة للتوريدات والتجارة العامة')).toBeInTheDocument();
       const logo = screen.getByRole('img');
       expect(logo).toHaveAttribute('src', '/logo.png');
     });
@@ -208,7 +212,8 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(screen.getByText(mockCustomer.phone!)).toBeInTheDocument();
       expect(screen.getByText(mockCustomer.address!)).toBeInTheDocument();
       expect(screen.getByText('آجل')).toBeInTheDocument();
-      expect(screen.getByText('معتمدة وخصمت من المخزون')).toBeInTheDocument();
+      expect(screen.getByText('نوع المستند:')).toBeInTheDocument();
+      expect(screen.getByText('بيان الأسعار')).toBeInTheDocument();
     });
 
     it('renders Items table with discount column when discounts exist', () => {
@@ -260,7 +265,7 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(screen.queryByText('شروط وملاحظات الفاتورة:')).not.toBeInTheDocument();
     });
 
-    it('renders Footer with 3 signatures boxes and company banner', () => {
+    it('renders Footer with 3 signatures boxes and 2 balanced branch columns without "الوقف"', () => {
       const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
       render(<InvoicePrintFooter data={model} />);
 
@@ -268,7 +273,19 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(screen.getByText(`الاسم: ${mockCustomer.name}`)).toBeInTheDocument();
       expect(screen.getByText('المحاسب / مسؤول المخزن')).toBeInTheDocument();
       expect(screen.getByText('اعتماد الإدارة وختم الشركة')).toBeInTheDocument();
-      expect(screen.getByText('نسعد دائماً بخدمتكم وتوفير أفضل العروض والمنتجات')).toBeInTheDocument();
+
+      // Branches verification
+      expect(screen.getByText('فرع قنا')).toBeInTheDocument();
+      expect(screen.getByText('قنا - بجوار مركز شباب عزبة علام')).toBeInTheDocument();
+      expect(screen.getByText('01008949310')).toBeInTheDocument();
+      expect(screen.getAllByText('01001239995').length).toBeGreaterThanOrEqual(1);
+
+      expect(screen.getByText('فرع الغردقة')).toBeInTheDocument();
+      expect(screen.getByText('الغردقة - شيراتون')).toBeInTheDocument();
+      expect(screen.getByText('01020680007')).toBeInTheDocument();
+
+      // Verify "الوقف" is strictly absent
+      expect(screen.queryByText(/الوقف/)).not.toBeInTheDocument();
     });
 
     it('renders full InvoicePrintTemplate with A4 sheet layout', () => {
