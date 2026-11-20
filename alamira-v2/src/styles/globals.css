@@ -270,6 +270,49 @@
     display: none !important;
   }
 
+  /* Clean in-page printing from preview modal on mobile / fallback */
+  .invoice-print-modal-backdrop {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  .invoice-print-modal-actions {
+    display: none !important;
+  }
+
+  .invoice-print-modal-scroll {
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  .invoice-print-modal-scale-wrapper {
+    position: static !important;
+    transform: none !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    left: auto !important;
+    display: block !important;
+  }
+
+  .invoice-print-modal-inner-scale {
+    position: static !important;
+    transform: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    left: auto !important;
+    box-shadow: none !important;
+    display: block !important;
+  }
+
   .invoice-sheet {
     box-shadow: none !important;
     width: 100% !important;

@@ -1,16 +1,31 @@
 /**
- * High-Resolution Invoice PNG Export Utility
- * Uses html2canvas to capture the exact rendered invoice sheet at 2x retina scale.
- * Preserves Arabic RTL typography, navy-and-gold styling, and full document bounds.
- * Transparently converts Tailwind v4 oklch() colors to sRGB for html2canvas compatibility.
+ * High-Resolution Invoice PNG Export Utility (Desktop & Mobile Compatible)
+ * 
+ * - Desktop:
+ *   Retina-quality 2x canvas rasterization and direct file download via Blob URL.
+ * 
+ * - Mobile Phones & PWAs:
+ *   Calibrated 1.5x scale to prevent mobile canvas memory crashes.
+ *   Uses canvas.toBlob() with real image/png Blobs (avoiding Android Chrome's block on data: URLs).
+ *   Integrates Web Share API (navigator.share) with File objects where supported.
+ *   Provides full Blob and URL references for interactive mobile preview & long-press save.
  */
 
 import html2canvas from 'html2canvas';
+import { isMobileDevice } from './printInvoice';
 
 export interface PngExportResult {
   success: boolean;
   fileName?: string;
+  blob?: Blob;
+  blobUrl?: string;
+  dataUrl?: string;
+  method?: 'share' | 'download' | 'preview';
   error?: string;
+}
+
+export interface PngExportOptions {
+  preferShare?: boolean;
 }
 
 function oklchToRgb(l: number, c: number, h: number, a: number = 1): string {
@@ -62,7 +77,8 @@ function convertOklchStringToRgb(str: string | null | undefined): string {
 
 export async function exportInvoicePng(
   element: HTMLElement | null,
-  invoiceNumber: string
+  invoiceNumber: string,
+  options?: PngExportOptions
 ): Promise<PngExportResult> {
   if (!element) {
     return {
@@ -71,6 +87,7 @@ export async function exportInvoicePng(
     };
   }
 
+  const isMobile = isMobileDevice();
   const origWindowGCS = window.getComputedStyle;
 
   const wrapWindowGCS = (targetWindow: Window) => {
@@ -98,15 +115,21 @@ export async function exportInvoicePng(
   try {
     // Ensure document fonts have completed loading before rasterization
     if (document.fonts && document.fonts.ready) {
-      await document.fonts.ready;
+      try {
+        await document.fonts.ready;
+      } catch (fontErr) {
+        console.warn('Font readiness check skipped or timed out:', fontErr);
+      }
     }
 
     // Intercept computed styles to convert modern CSS oklch() to sRGB for html2canvas
     wrapWindowGCS(window);
 
-    // High resolution retina canvas rendering (scale: 2)
+    // On mobile, use 1.5 scale to avoid canvas memory exhaustion; on desktop use 2x retina
+    const renderScale = isMobile ? 1.5 : 2;
+
     const canvas = await html2canvas(element, {
-      scale: 2,
+      scale: renderScale,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
@@ -140,18 +163,128 @@ export async function exportInvoicePng(
     const safeNumber = invoiceNumber ? invoiceNumber.replace(/[/\\?%*:|"<>]/g, '-') : 'مبيعات';
     const fileName = `فاتورة_الأميرة_${safeNumber}.png`;
 
-    const dataUrl = canvas.toDataURL('image/png');
+    // Convert canvas to Blob (essential for mobile & Blob URLs)
+    let blob: Blob | null = null;
+    if (typeof canvas.toBlob === 'function') {
+      blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((b) => resolve(b), 'image/png');
+      });
+    }
+
+    // Fallback: convert dataURL to Blob if toBlob is not natively supported
+    if (!blob && typeof canvas.toDataURL === 'function') {
+      try {
+        const dataUrl = canvas.toDataURL('image/png');
+        if (typeof window !== 'undefined' && typeof window.atob === 'function') {
+          const base64Data = dataUrl.split(',')[1] || '';
+          const byteString = atob(base64Data);
+          const mimeMatch = dataUrl.split(',')[0].match(/:(.*?);/);
+          const mimeString = mimeMatch ? mimeMatch[1] : 'image/png';
+          const ab = new ArrayBuffer(byteString.length);
+          const ia = new Uint8Array(ab);
+          for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+          }
+          blob = new Blob([ab], { type: mimeString });
+        }
+      } catch (convErr) {
+        console.warn('Canvas to Blob conversion fallback failed:', convErr);
+      }
+    }
+
+    if (!blob) {
+      // Fallback to dataUrl if toBlob fails
+      const fallbackDataUrl = typeof canvas.toDataURL === 'function' ? canvas.toDataURL('image/png') : '';
+      if (fallbackDataUrl) {
+        const fallbackLink = document.createElement('a');
+        fallbackLink.download = fileName;
+        fallbackLink.href = fallbackDataUrl;
+        fallbackLink.style.display = 'none';
+        document.body.appendChild(fallbackLink);
+        fallbackLink.click();
+        document.body.removeChild(fallbackLink);
+      }
+
+      return {
+        success: true,
+        fileName,
+        dataUrl: fallbackDataUrl,
+        method: 'download',
+      };
+    }
+
+    const blobUrl =
+      typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
+        ? URL.createObjectURL(blob)
+        : (typeof canvas.toDataURL === 'function' ? canvas.toDataURL('image/png') : '');
+
+    // ==========================================
+    // 1. MOBILE NATIVE SHARING (Web Share API with File)
+    // ==========================================
+    if (isMobile && options?.preferShare !== false) {
+      try {
+        const file = new File([blob], fileName, { type: 'image/png' });
+        const canShareFiles =
+          typeof navigator !== 'undefined' &&
+          Boolean(navigator.share) &&
+          Boolean(navigator.canShare && navigator.canShare({ files: [file] }));
+
+        if (canShareFiles) {
+          await navigator.share({
+            files: [file],
+            title: `فاتورة مبيعات (${safeNumber})`,
+            text: `فاتورة مبيعات رقم ${safeNumber} - شركة الأميرة للتوريدات والتجارة العامة`,
+          });
+
+          return {
+            success: true,
+            fileName,
+            blob,
+            blobUrl,
+            method: 'share',
+          };
+        }
+      } catch (shareErr) {
+        // If user cancelled the share sheet (AbortError), that's not a failure
+        if (shareErr instanceof Error && shareErr.name === 'AbortError') {
+          return {
+            success: true,
+            fileName,
+            blob,
+            blobUrl,
+            method: 'preview',
+          };
+        }
+        console.warn('Web Share failed, proceeding to direct Blob download:', shareErr);
+      }
+    }
+
+    // ==========================================
+    // 2. STANDARD / FALLBACK BLOB DOWNLOAD
+    // ==========================================
     const link = document.createElement('a');
     link.download = fileName;
-    link.href = dataUrl;
+    link.href = blobUrl;
     link.style.display = 'none';
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+
+    // Keep Blob URL alive for 2 minutes to allow mobile downloads to complete
+    setTimeout(() => {
+      if (document.body.contains(link)) {
+        document.body.removeChild(link);
+      }
+      if (blobUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(blobUrl);
+      }
+    }, 120000);
 
     return {
       success: true,
       fileName,
+      blob,
+      blobUrl,
+      method: isMobile ? 'preview' : 'download',
     };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);

@@ -6,6 +6,7 @@ interface InvoicePrintActionsProps {
   onPrint: () => void;
   onExportPng: () => void;
   onClose: () => void;
+  isPrinting?: boolean;
   isExporting?: boolean;
   scale?: number;
   zoomMode?: 'fit' | 'actual';
@@ -16,11 +17,14 @@ export const InvoicePrintActions: React.FC<InvoicePrintActionsProps> = ({
   onPrint,
   onExportPng,
   onClose,
+  isPrinting = false,
   isExporting = false,
   scale,
   zoomMode = 'fit',
   onToggleZoom,
 }) => {
+  const isBusy = isPrinting || isExporting;
+
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 p-3 sm:px-6 sm:py-3.5 bg-white border-b border-slate-200">
       {/* Utility / Meta row on mobile (order-2 on desktop, order-1 on mobile) */}
@@ -43,6 +47,7 @@ export const InvoicePrintActions: React.FC<InvoicePrintActionsProps> = ({
               variant="outline"
               size="sm"
               onClick={onToggleZoom}
+              disabled={isBusy}
               className="h-8 px-2 text-xs font-medium text-slate-700 border-slate-200 hover:bg-slate-50 gap-1 sm:hidden"
               title={zoomMode === 'actual' ? 'ملاءمة للشاشة' : 'عرض بالحجم الأصلي'}
             >
@@ -66,7 +71,7 @@ export const InvoicePrintActions: React.FC<InvoicePrintActionsProps> = ({
           variant="ghost"
           size="sm"
           onClick={onClose}
-          disabled={isExporting}
+          disabled={isBusy}
           className="h-8 px-2.5 gap-1.5 text-slate-600 hover:text-slate-900 shrink-0 font-medium"
         >
           <X className="w-4 h-4 shrink-0" />
@@ -79,23 +84,32 @@ export const InvoicePrintActions: React.FC<InvoicePrintActionsProps> = ({
         <Button
           variant="primary"
           onClick={onPrint}
-          disabled={isExporting}
-          className="bg-[#0a192f] hover:bg-[#0f2b5c] text-white border-none gap-1.5 sm:gap-2 font-bold px-3 sm:px-4 h-9 sm:h-9.5 justify-center text-xs sm:text-sm w-full sm:w-auto shrink-0 shadow-xs"
+          disabled={isBusy}
+          className="bg-[#0a192f] hover:bg-[#0f2b5c] text-white border-none gap-1.5 sm:gap-2 font-bold px-3 sm:px-4 h-9 sm:h-9.5 justify-center text-xs sm:text-sm w-full sm:w-auto shrink-0 shadow-xs cursor-pointer disabled:opacity-50"
         >
-          <Printer className="w-4 h-4 shrink-0 text-[#d4af37]" />
-          <span className="truncate">طباعة الفاتورة (A4)</span>
+          {isPrinting ? (
+            <>
+              <Loader2 className="w-4 h-4 shrink-0 animate-spin text-[#d4af37]" />
+              <span className="truncate">جاري فتح الطباعة...</span>
+            </>
+          ) : (
+            <>
+              <Printer className="w-4 h-4 shrink-0 text-[#d4af37]" />
+              <span className="truncate">طباعة الفاتورة (A4)</span>
+            </>
+          )}
         </Button>
 
         <Button
           variant="secondary"
           onClick={onExportPng}
-          disabled={isExporting}
-          className="gap-1.5 sm:gap-2 font-bold px-3 sm:px-4 h-9 sm:h-9.5 justify-center text-xs sm:text-sm border-slate-300 hover:bg-slate-50 w-full sm:w-auto shrink-0 shadow-xs"
+          disabled={isBusy}
+          className="gap-1.5 sm:gap-2 font-bold px-3 sm:px-4 h-9 sm:h-9.5 justify-center text-xs sm:text-sm border-slate-300 hover:bg-slate-50 w-full sm:w-auto shrink-0 shadow-xs cursor-pointer disabled:opacity-50"
         >
           {isExporting ? (
             <>
               <Loader2 className="w-4 h-4 shrink-0 animate-spin text-emerald-600" />
-              <span className="truncate">جاري الإنشاء...</span>
+              <span className="truncate">جاري تجهيز الصورة...</span>
             </>
           ) : (
             <>

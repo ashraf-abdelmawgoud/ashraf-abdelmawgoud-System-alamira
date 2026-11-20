@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { SalesInvoice, Customer } from '../types';
 import {
@@ -13,16 +13,29 @@ import { InvoicePrintTotals } from '../features/invoices/print/InvoicePrintTotal
 import { InvoicePrintFooter } from '../features/invoices/print/InvoicePrintFooter';
 import { InvoicePrintTemplate } from '../features/invoices/print/InvoicePrintTemplate';
 import { InvoicePrintPreview } from '../features/invoices/print/InvoicePrintPreview';
-import { printInvoice } from '../features/invoices/print/printInvoice';
+import { printInvoice, isMobileDevice } from '../features/invoices/print/printInvoice';
 import { exportInvoicePng } from '../features/invoices/print/exportInvoicePng';
+import { InvoicePrintActions } from '../features/invoices/print/InvoicePrintActions';
 import { mockDataService } from '../services/mockDataService';
+
+// Ensure URL.createObjectURL and revokeObjectURL exist in JSDOM
+if (typeof URL.createObjectURL !== 'function') {
+  URL.createObjectURL = vi.fn(() => 'blob:http://localhost/mock-blob-uuid');
+}
+if (typeof URL.revokeObjectURL !== 'function') {
+  URL.revokeObjectURL = vi.fn();
+}
 
 // Mock html2canvas for unit tests
 vi.mock('html2canvas', () => {
   return {
     default: vi.fn().mockImplementation(() =>
       Promise.resolve({
-        toDataURL: () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        toDataURL: () =>
+          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        toBlob: (callback: (blob: Blob) => void) => {
+          callback(new Blob(['fake-image-bytes'], { type: 'image/png' }));
+        },
       })
     ),
   };
@@ -613,6 +626,222 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
 
       // Subtle company identity line
       expect(screen.getByText(/الأميرة للتوريدات والتجارة العامة — نسعد بخدمتكم دائماً/)).toBeInTheDocument();
+    });
+  });
+
+  describe('6. Mobile Printing & PNG Export Compatibility', () => {
+    const originalUserAgent = navigator.userAgent;
+
+    const setUserAgent = (ua: string) => {
+      Object.defineProperty(navigator, 'userAgent', {
+        value: ua,
+        configurable: true,
+      });
+    };
+
+    afterEach(() => {
+      setUserAgent(originalUserAgent);
+    });
+
+    it('A. isMobileDevice correctly identifies mobile devices vs desktop', () => {
+      // Android phone
+      setUserAgent('Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 Mobile Safari/537.36');
+      expect(isMobileDevice()).toBe(true);
+
+      // iPhone
+      setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148');
+      expect(isMobileDevice()).toBe(true);
+
+      // Desktop Windows
+      setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36');
+      expect(isMobileDevice()).toBe(false);
+    });
+
+    it('B. Mobile Print: Opens synchronous popup window with toolbar when popup allowed', () => {
+      setUserAgent('Mozilla/5.0 (Linux; Android 14; SM-G998B) AppleWebKit/537.36 Mobile Safari/537.36');
+
+      const mockPrintDoc = {
+        open: vi.fn(),
+        write: vi.fn(),
+        close: vi.fn(),
+      };
+
+      const mockPrintWindow = {
+        document: mockPrintDoc,
+        focus: vi.fn(),
+        print: vi.fn(),
+        close: vi.fn(),
+      } as unknown as Window;
+
+      const windowOpenSpy = vi.spyOn(window, 'open').mockReturnValue(mockPrintWindow);
+
+      const dummyElement = document.createElement('div');
+      dummyElement.className = 'invoice-sheet';
+      dummyElement.innerHTML = '<p>Invoice Content for Mobile</p>';
+
+      const success = printInvoice(dummyElement, { invoiceNumber: 'INV-MOB-01' });
+
+      expect(success).toBe(true);
+      expect(windowOpenSpy).toHaveBeenCalledWith('', '_blank');
+      expect(mockPrintDoc.write).toHaveBeenCalled();
+
+      // Check toolbar contents in written HTML
+      const writtenHtml = mockPrintDoc.write.mock.calls[0][0] as string;
+      expect(writtenHtml).toContain('طباعة / حفظ بتنسيق PDF');
+      expect(writtenHtml).toContain('إغلاق');
+      expect(writtenHtml).toContain('Invoice Content for Mobile');
+      expect(mockPrintDoc.close).toHaveBeenCalled();
+
+      windowOpenSpy.mockRestore();
+    });
+
+    it('C. Mobile Print Fallback: Falls back to in-page window.print() if popup is blocked', () => {
+      setUserAgent('Mozilla/5.0 (Linux; Android 14; SM-G998B) AppleWebKit/537.36 Mobile Safari/537.36');
+
+      const windowOpenSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+      const windowPrintSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
+
+      const dummyElement = document.createElement('div');
+      dummyElement.className = 'invoice-sheet';
+      dummyElement.innerHTML = '<p>Invoice Content</p>';
+
+      const success = printInvoice(dummyElement, { invoiceNumber: 'INV-MOB-02' });
+
+      expect(success).toBe(true);
+      expect(windowOpenSpy).toHaveBeenCalledWith('', '_blank');
+      expect(windowPrintSpy).toHaveBeenCalled();
+
+      windowOpenSpy.mockRestore();
+      windowPrintSpy.mockRestore();
+    });
+
+    it('D. Desktop Print: Uses isolated iframe workflow and does not call window.open', () => {
+      setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Safari/537.36');
+
+      const windowOpenSpy = vi.spyOn(window, 'open');
+
+      const dummyElement = document.createElement('div');
+      dummyElement.className = 'invoice-sheet';
+      dummyElement.innerHTML = '<p>Desktop Invoice</p>';
+
+      const success = printInvoice(dummyElement, { invoiceNumber: 'INV-DESK-01' });
+
+      expect(success).toBe(true);
+      expect(windowOpenSpy).not.toHaveBeenCalled();
+
+      windowOpenSpy.mockRestore();
+    });
+
+    it('E. Mobile PNG Export: Invokes Web Share API when supported on mobile', async () => {
+      setUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Mobile Safari/537.36');
+
+      const shareMock = vi.fn().mockResolvedValue(undefined);
+      const canShareMock = vi.fn().mockReturnValue(true);
+
+      Object.defineProperty(navigator, 'share', {
+        value: shareMock,
+        configurable: true,
+      });
+      Object.defineProperty(navigator, 'canShare', {
+        value: canShareMock,
+        configurable: true,
+      });
+
+      const dummyElement = document.createElement('div');
+      dummyElement.className = 'invoice-sheet';
+      dummyElement.innerHTML = '<p>Invoice for Web Share</p>';
+
+      const result = await exportInvoicePng(dummyElement, 'INV-SHARE-01');
+
+      expect(result.success).toBe(true);
+      expect(result.method).toBe('share');
+      expect(shareMock).toHaveBeenCalled();
+      expect(shareMock.mock.calls[0][0].title).toContain('فاتورة مبيعات');
+    });
+
+    it('F. InvoicePrintActions: Displays responsive loading states and prevents double-taps', () => {
+      const { rerender } = render(
+        <InvoicePrintActions
+          onPrint={vi.fn()}
+          onExportPng={vi.fn()}
+          onClose={vi.fn()}
+          isPrinting={false}
+          isExporting={false}
+        />
+      );
+
+      // Normal state
+      expect(screen.getByText('طباعة الفاتورة (A4)')).toBeInTheDocument();
+      expect(screen.getByText('تصدير صورة PNG')).toBeInTheDocument();
+
+      // Printing state
+      rerender(
+        <InvoicePrintActions
+          onPrint={vi.fn()}
+          onExportPng={vi.fn()}
+          onClose={vi.fn()}
+          isPrinting={true}
+          isExporting={false}
+        />
+      );
+
+      expect(screen.getByText('جاري فتح الطباعة...')).toBeInTheDocument();
+      const printBtn = screen.getByText('جاري فتح الطباعة...').closest('button');
+      expect(printBtn).toBeDisabled();
+
+      // Exporting state
+      rerender(
+        <InvoicePrintActions
+          onPrint={vi.fn()}
+          onExportPng={vi.fn()}
+          onClose={vi.fn()}
+          isPrinting={false}
+          isExporting={true}
+        />
+      );
+
+      expect(screen.getByText('جاري تجهيز الصورة...')).toBeInTheDocument();
+      const exportBtn = screen.getByText('جاري تجهيز الصورة...').closest('button');
+      expect(exportBtn).toBeDisabled();
+    });
+
+    it('G. InvoicePrintPreview: Shows ExportImageModal on mobile after PNG export', async () => {
+      setUserAgent('Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 Mobile Safari/537.36');
+
+      // Make canShare return false so it falls back to preview modal
+      Object.defineProperty(navigator, 'canShare', {
+        value: vi.fn().mockReturnValue(false),
+        configurable: true,
+      });
+
+      const onNotification = vi.fn();
+      render(
+        <InvoicePrintPreview
+          invoice={sampleInvoiceWithDiscounts}
+          customer={mockCustomer}
+          isOpen={true}
+          onClose={vi.fn()}
+          onNotification={onNotification}
+        />
+      );
+
+      fireEvent.click(screen.getByText('تصدير صورة PNG'));
+
+      await waitFor(() => {
+        expect(onNotification).toHaveBeenCalledWith(
+          expect.stringContaining('تم تصدير الفاتورة كصورة PNG بنجاح'),
+          'success'
+        );
+      });
+
+      // Verify ExportImageModal appears on mobile
+      await waitFor(() => {
+        expect(screen.getByText('صورة الفاتورة المعتمدة (جاهزة للحفظ)')).toBeInTheDocument();
+        expect(
+          screen.getByText(/يمكنك أيضاً الضغط مطولاً على الصورة لحفظها مباشرة في ألبوم الصور بهاتفك/)
+        ).toBeInTheDocument();
+        expect(screen.getByText('تنزيل الصورة')).toBeInTheDocument();
+      });
     });
   });
 });
