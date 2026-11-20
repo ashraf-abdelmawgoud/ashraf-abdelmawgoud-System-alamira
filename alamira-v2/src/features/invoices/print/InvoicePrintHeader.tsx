@@ -25,7 +25,7 @@ export const InvoicePrintHeader: React.FC<InvoicePrintHeaderProps> = ({ data }) 
             <img
               src={data.company.logoUrl}
               alt={data.company.name}
-              className="print-official-logo h-12 max-w-[280px] object-contain block mb-1"
+              className="print-official-logo h-12 max-w-[280px] w-auto object-contain block mb-1"
               onError={() => setLogoError(true)}
             />
           ) : (

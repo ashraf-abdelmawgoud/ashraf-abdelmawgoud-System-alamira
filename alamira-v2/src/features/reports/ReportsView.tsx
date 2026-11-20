@@ -70,19 +70,21 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onNotification }) => {
     salesInvoices
       .filter((i) => {
         if (i.status !== 'approved') return false
-        if (dateFrom && i.invoice_date < dateFrom) return false
-        if (dateTo && i.invoice_date > dateTo) return false
+        const invDate = (i.invoice_date || '').slice(0, 10)
+        if (dateFrom && invDate < dateFrom) return false
+        if (dateTo && invDate > dateTo) return false
         return true
       })
       .forEach((inv) => {
         ;(inv.items || []).forEach((item) => {
-          const ex = productMap.get(item.product_id) || {
+          const prodKey = item.product_id || item.product_sku_snapshot || item.product_name_snapshot || 'unknown'
+          const ex = productMap.get(prodKey) || {
             name: item.product_name_snapshot || 'صنف',
             sku: item.product_sku_snapshot || '',
             revenue: 0,
           }
           ex.revenue += Number(item.net_amount || item.gross_amount || 0)
-          productMap.set(item.product_id, ex)
+          productMap.set(prodKey, ex)
         })
       })
 

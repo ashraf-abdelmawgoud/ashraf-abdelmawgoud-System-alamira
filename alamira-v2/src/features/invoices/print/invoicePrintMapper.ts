@@ -60,7 +60,7 @@ export const OFFICIAL_COMPANY_INFO = {
   name: 'الأميرة للتوريدات العامة والتجارة',
   subtitle: 'توريدات عمومية وتجارة - استيراد وتصدير وتوكيلات',
   address: 'قنا – الوقف – بجوار مركز شباب عزبة علام',
-  logoUrl: '/assets/logo.png',
+  logoUrl: '/logo.png',
 };
 
 export function mapInvoiceToPrintModel(

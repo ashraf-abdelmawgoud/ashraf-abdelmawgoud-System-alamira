@@ -16,6 +16,9 @@ import {
 import {
   calculateInvoiceTotals,
 } from '@/domain/invoiceCalculations'
+import { getCairoDateString } from '@/lib/formatters'
+import { useAuth } from '@/auth'
+import { canViewExactStock } from '@/auth/rbac'
 import { InvoiceLineItems, LineItemFormState } from './InvoiceLineItems'
 import { InvoiceTotals } from './InvoiceTotals'
 
@@ -34,8 +37,10 @@ export const InvoiceBuilder: React.FC<InvoiceBuilderProps> = ({
   onSave,
   onClose,
 }) => {
+  const { currentUser } = useAuth()
+  const hasExactStockView = canViewExactStock(currentUser)
   const isEditing = Boolean(initialInvoice && initialInvoice.id)
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = getCairoDateString()
 
   // Header State
   const [invoiceDate, setInvoiceDate] = useState(
@@ -183,7 +188,7 @@ export const InvoiceBuilder: React.FC<InvoiceBuilderProps> = ({
           setErrorMessage(`الصنف "${prod.name}" موقوف/مؤرشف ولا يمكن بيعه في فواتير معتمدة`)
           return
         }
-        if (it.quantity > prod.current_stock) {
+        if (hasExactStockView && it.quantity > prod.current_stock) {
           setErrorMessage(
             `تعذر الاعتماد: رصيد الصنف "${prod.name}" في المخزن غير كافٍ لإتمام البيع (المتاح بالمخزن: ${prod.current_stock} ${prod.unit}، المطلوب: ${it.quantity} ${prod.unit}). يمكنك حفظ الفاتورة كمسودة.`
           )

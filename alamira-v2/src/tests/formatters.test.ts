@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { formatCurrency, formatNumber, formatDate } from '@/lib/formatters'
+import {
+  formatCurrency,
+  formatNumber,
+  formatDate,
+  getQenaDateString,
+  getCairoDateString,
+} from '@/lib/formatters'
 
 describe('Formatters Utility', () => {
   describe('formatCurrency', () => {
@@ -50,6 +56,16 @@ describe('Formatters Utility', () => {
     it('returns dash for invalid or empty dates', () => {
       expect(formatDate('')).toBe('-')
       expect(formatDate('invalid-date')).toBe('-')
+    })
+  })
+
+  describe('getQenaDateString and getCairoDateString', () => {
+    it('returns YYYY-MM-DD formatted date in Egypt timezone', () => {
+      const fixedDate = new Date('2026-11-20T23:30:00Z')
+      const result = getQenaDateString(fixedDate)
+      // 23:30 UTC is next day 01:30 in Egypt (UTC+2)
+      expect(result).toBe('2026-11-21')
+      expect(getCairoDateString(fixedDate)).toBe('2026-11-21')
     })
   })
 })

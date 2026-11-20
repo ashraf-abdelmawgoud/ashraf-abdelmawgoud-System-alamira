@@ -66,6 +66,19 @@ export function formatQenaDateTime(
 export const formatCairoDateTime = formatQenaDateTime
 
 /**
+ * Returns YYYY-MM-DD date string in official Egypt local time (Africa/Cairo)
+ */
+export function getQenaDateString(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: QENA_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+export const getCairoDateString = getQenaDateString
+
+/**
  * Formats an ISO date string or Date object into human-readable Arabic date
  * adhering to official Qena / Egypt local time.
  */

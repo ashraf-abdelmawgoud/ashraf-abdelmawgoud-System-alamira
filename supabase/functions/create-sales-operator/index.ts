@@ -293,7 +293,7 @@ serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           error: isDuplicate
-            ? 'البريد الإلكتروني مسجل بالفعل في نظام المصادقة'
+            ? 'البريد الإلكتروني مسجل بالفعل في نظام المصادقة (Auth Identity). يرجى استخدام بريد إلكتروني آخر أو مراجعة الحسابات المعلقة.'
             : 'تعذر إنشاء هوية المستخدم في نظام المصادقة. يرجى التحقق من صحة البيانات المدخلة.',
         }),
         { status: isDuplicate ? 409 : 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

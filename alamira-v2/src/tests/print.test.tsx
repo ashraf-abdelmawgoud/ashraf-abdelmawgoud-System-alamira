@@ -150,7 +150,7 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(model.company.name).toBe(OFFICIAL_COMPANY_INFO.name);
       expect(model.company.name).toBe('الأميرة للتوريدات العامة والتجارة');
       expect(model.company.address).toBe('قنا – الوقف – بجوار مركز شباب عزبة علام');
-      expect(model.company.logoUrl).toBe('/assets/logo.png');
+      expect(model.company.logoUrl).toBe('/logo.png');
     });
 
     it('maps customer details and transaction metadata correctly', () => {
@@ -197,7 +197,7 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(screen.getByText('2026-11-17')).toBeInTheDocument();
       expect(screen.getByText(OFFICIAL_COMPANY_INFO.address)).toBeInTheDocument();
       const logo = screen.getByRole('img');
-      expect(logo).toHaveAttribute('src', '/assets/logo.png');
+      expect(logo).toHaveAttribute('src', '/logo.png');
     });
 
     it('renders CustomerInfo grid with name, phone, address, and metadata', () => {

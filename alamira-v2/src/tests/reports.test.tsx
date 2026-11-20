@@ -498,5 +498,18 @@ describe('Phase 4 — Reports & Analytics Domain & Excel Engine', () => {
         })
       ).rejects.toThrow(/ADMIN ONLY/i);
     });
+
+    it('reportingService handles invoices with timestamp dates and aggregates daily summaries by date prefix', async () => {
+      const { reportingService } = await import('../services/reportingService');
+      const daily = await reportingService.getSalesReport({
+        subType: 'daily_summary',
+        userRole: 'ADMIN',
+      });
+      expect(daily.category).toBe('sales');
+      // Ensure daily summary dates are YYYY-MM-DD
+      daily.rows.forEach((row) => {
+        expect(row.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      });
+    });
   });
 });

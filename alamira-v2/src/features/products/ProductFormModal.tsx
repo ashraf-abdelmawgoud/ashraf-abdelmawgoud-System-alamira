@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
+import { Plus } from 'lucide-react'
 import { Modal, Button, Input, Select } from '@/components/ui'
 import { Product, ProductFormData } from '@/types'
 import { useAuth } from '@/auth'
+import { getAllUnits, addCustomUnit } from '@/services/measurementUnitsService'
 
 export interface ProductFormModalProps {
   isOpen: boolean
@@ -11,8 +13,6 @@ export interface ProductFormModalProps {
   categories: string[]
 }
 
-const DEFAULT_UNITS = ['قطعة', 'لفة', 'متر', 'كرتونة', 'طقم', 'عود', 'كيس', 'كيلو']
-
 export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   isOpen,
   onClose,
@@ -20,9 +20,15 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   product,
   categories,
 }) => {
-  const { canViewCostPrice } = useAuth()
+  const { canViewCostPrice, currentUser } = useAuth()
   const canViewCost = canViewCostPrice
+  const isAdmin = currentUser?.role === 'ADMIN'
   const isEditing = Boolean(product)
+
+  const [availableUnits, setAvailableUnits] = useState<string[]>(() => getAllUnits())
+  const [showAddCustomUnit, setShowAddCustomUnit] = useState(false)
+  const [customUnitInput, setCustomUnitInput] = useState('')
+  const [customUnitError, setCustomUnitError] = useState('')
 
   const [formData, setFormData] = useState<ProductFormData>({
     sku: '',
@@ -71,8 +77,30 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         is_active: true,
       })
     }
+    const all = getAllUnits()
+    if (product?.unit && !all.includes(product.unit)) {
+      setAvailableUnits([product.unit, ...all])
+    } else {
+      setAvailableUnits(all)
+    }
+    setShowAddCustomUnit(false)
+    setCustomUnitInput('')
+    setCustomUnitError('')
     setErrors({})
   }, [product, categories, isOpen])
+
+  const handleSaveCustomUnit = () => {
+    const res = addCustomUnit(customUnitInput)
+    if (!res.success) {
+      setCustomUnitError(res.error || 'تعذر إضافة وحدة القياس')
+      return
+    }
+    setAvailableUnits(res.units)
+    setFormData((prev) => ({ ...prev, unit: res.unit || customUnitInput.trim() }))
+    setCustomUnitInput('')
+    setCustomUnitError('')
+    setShowAddCustomUnit(false)
+  }
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}
@@ -187,18 +215,77 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             <option value="عام">عام / أخرى</option>
           </Select>
 
-          <Select
-            label="وحدة القياس"
-            value={formData.unit}
-            onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-            disabled={isSubmitting}
-          >
-            {DEFAULT_UNITS.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </Select>
+          <div className="space-y-1.5 text-right">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-neutral-700">وحدة القياس</label>
+              {isAdmin && !showAddCustomUnit && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddCustomUnit(true)}
+                  className="text-xs text-[#0F766E] hover:text-[#115E59] font-bold flex items-center gap-1 transition-colors"
+                  title="إضافة وحدة قياس مخصصة للنظام"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>إضافة وحدة مخصصة</span>
+                </button>
+              )}
+            </div>
+
+            {showAddCustomUnit ? (
+              <div className="p-2.5 bg-teal-50/70 border border-teal-200 rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-teal-900">إضافة وحدة قياس مخصصة</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddCustomUnit(false)
+                      setCustomUnitError('')
+                    }}
+                    className="text-xs text-neutral-500 hover:text-neutral-700"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={customUnitInput}
+                    onChange={(e) => {
+                      setCustomUnitInput(e.target.value)
+                      setCustomUnitError('')
+                    }}
+                    placeholder="مثال: شيكارة، درزن..."
+                    className="flex-1 p-1.5 text-xs border border-teal-300 rounded-md focus:ring-2 focus:ring-teal-500 bg-white"
+                    autoFocus
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="primary"
+                    onClick={handleSaveCustomUnit}
+                    className="bg-teal-700 hover:bg-teal-800 text-white text-xs px-2.5 py-1"
+                  >
+                    حفظ
+                  </Button>
+                </div>
+                {customUnitError && (
+                  <p className="text-[11px] text-rose-600 font-bold">{customUnitError}</p>
+                )}
+              </div>
+            ) : (
+              <Select
+                value={formData.unit}
+                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                disabled={isSubmitting}
+              >
+                {availableUnits.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </div>
         </div>
 
         {/* Pricing Fields */}

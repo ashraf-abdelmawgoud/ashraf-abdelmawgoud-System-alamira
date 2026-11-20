@@ -156,8 +156,9 @@ function filterApprovedInvoices(
 ): SalesInvoice[] {
   return invoices.filter((inv) => {
     if (inv.status !== 'approved') return false
-    if (from && inv.invoice_date < from) return false
-    if (to && inv.invoice_date > to) return false
+    const invDate = (inv.invoice_date || '').slice(0, 10)
+    if (from && invDate < from) return false
+    if (to && invDate > to) return false
     if (options?.customerId && inv.customer_id !== options.customerId) return false
     if (options?.operatorId && inv.created_by !== options.operatorId) return false
     return true
@@ -347,7 +348,8 @@ export const reportingService = {
         approvedInvoices.forEach((inv) => {
           (inv.items || []).forEach((item) => {
             if (options.productId && item.product_id !== options.productId) return
-            const existing = productMap.get(item.product_id) || {
+            const prodKey = item.product_id || item.product_sku_snapshot || item.product_name_snapshot || 'unknown'
+            const existing = productMap.get(prodKey) || {
               sku: item.product_sku_snapshot || '---',
               name: item.product_name_snapshot || 'صنف غير معروف',
               unit: item.unit_snapshot || 'قطعة',
@@ -356,7 +358,7 @@ export const reportingService = {
             }
             existing.qty = round2(existing.qty + Number(item.quantity || 0))
             existing.revenue = round2(existing.revenue + Number(item.net_amount || item.gross_amount || 0))
-            productMap.set(item.product_id, existing)
+            productMap.set(prodKey, existing)
           })
         })
 
@@ -453,7 +455,7 @@ export const reportingService = {
         const dayMap = new Map<string, { date: string; count: number; total: number; discount: number }>()
 
         approvedInvoices.forEach((inv) => {
-          const d = inv.invoice_date
+          const d = (inv.invoice_date || '').slice(0, 10)
           const existing = dayMap.get(d) || { date: d, count: 0, total: 0, discount: 0 }
           existing.count += 1
           existing.total = round2(existing.total + (inv.final_total || 0))
