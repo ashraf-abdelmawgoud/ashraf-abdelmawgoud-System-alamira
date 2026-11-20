@@ -13,7 +13,7 @@ export const InvoicePrintCustomerInfo: React.FC<InvoicePrintCustomerInfoProps> =
       {/* Customer Information Card */}
       <div className="print-card-box border-[1.5px] border-[#cbd5e1] rounded-md p-2.5 bg-[#f8fafc] leading-relaxed">
         <div className="box-title text-[9pt] font-extrabold text-[#0a192f] border-b border-[#cbd5e1] pb-1 mb-1.5 flex items-center">
-          بيانات العميل المكرم
+          بيانات العميل
         </div>
         <div className="flex items-center gap-1">
           <span className="text-[#64748b]">الاسم / الجهة:</span>

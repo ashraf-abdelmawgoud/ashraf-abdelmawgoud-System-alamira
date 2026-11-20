@@ -2,6 +2,7 @@ import { formatNumber } from '@/lib/formatters'
 
 /**
  * Authoritative list of predefined Arabic measurement units for Al-Amira General Supplies & Trading.
+ * Strictly includes all 22 specified units plus preserved existing units.
  */
 export const PREDEFINED_UNITS: readonly string[] = [
   'قطعة',
@@ -18,18 +19,24 @@ export const PREDEFINED_UNITS: readonly string[] = [
   'علبة',
   'كرتونة',
   'صندوق',
-  'باكت',
+  'شوال',
+  'كيس',
   'رول',
   'لفة',
-  'كيس',
-  'زجاجة',
-  'دستة',
   'طقم',
   'زوج',
+  'دستة',
   'وحدة',
+  // Preserved additional units already supported by the application
   'عود',
   'كيلو',
+  'كجم',
+  'باكت',
+  'زجاجة',
 ] as const
+
+export const CUSTOM_UNIT_ACTION_VALUE = '__OTHER_CUSTOM_UNIT__'
+export const CUSTOM_UNIT_ACTION_LABEL = 'أخرى — إضافة وحدة مخصصة'
 
 const STORAGE_KEY = 'alamira_custom_measurement_units'
 
@@ -90,6 +97,7 @@ export interface AddCustomUnitResult {
 /**
  * Validates, saves, and persists a new custom measurement unit.
  * Accessible to ADMIN users.
+ * Supports valid Arabic and English unit names with whitespace trimming and duplicate prevention.
  */
 export function addCustomUnit(rawUnit: string): AddCustomUnitResult {
   const trimmed = (rawUnit || '').trim()
@@ -106,6 +114,16 @@ export function addCustomUnit(rawUnit: string): AddCustomUnitResult {
     return {
       success: false,
       error: 'اسم وحدة القياس لا يجب أن يتجاوز 30 حرفاً',
+      units: getAllUnits(),
+    }
+  }
+
+  // Accept valid Arabic and English letters, numbers, spaces, and standard punctuation
+  const validNameRegex = /^[\u0600-\u06FFa-zA-Z0-9\s\-._/]+$/
+  if (!validNameRegex.test(trimmed)) {
+    return {
+      success: false,
+      error: 'اسم وحدة القياس يجب أن يحتوي على حروف عربية أو إنجليزية أو أرقام فقط',
       units: getAllUnits(),
     }
   }
@@ -129,7 +147,9 @@ export function addCustomUnit(rawUnit: string): AddCustomUnitResult {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCustom))
       // Dispatch event to inform other listening views
-      window.dispatchEvent(new CustomEvent('alamira-units-updated', { detail: { newUnit: trimmed } }))
+      window.dispatchEvent(
+        new CustomEvent('alamira-units-updated', { detail: { newUnit: trimmed } })
+      )
     } catch (err) {
       console.error('[UnitsService] Failed to save custom unit to localStorage:', err)
       return {

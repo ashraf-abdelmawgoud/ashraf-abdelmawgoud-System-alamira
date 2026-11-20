@@ -10,7 +10,7 @@ export const InvoicePrintFooter: React.FC<InvoicePrintFooterProps> = ({ data }) 
   const branches = data.company.branches || {
     qena: {
       name: 'فرع قنا',
-      address: 'قنا - بجوار مركز شباب عزبة علام',
+      address: 'قنا',
       phones: ['01008949310', '01001239995'],
     },
     hurghada: {

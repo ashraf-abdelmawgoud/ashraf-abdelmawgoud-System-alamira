@@ -63,6 +63,9 @@ export const ProductMobileCard: React.FC<ProductMobileCardProps> = ({
             <span className="text-[11px] text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded">
               {product.category}
             </span>
+            <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+              {product.unit || 'وحدة'}
+            </span>
           </div>
           <h4 className="font-bold text-sm text-neutral-900 mt-1 leading-snug line-clamp-2">
             {product.name}

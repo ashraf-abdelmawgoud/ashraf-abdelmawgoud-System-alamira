@@ -149,9 +149,9 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
       expect(model.company.name).toBe(OFFICIAL_COMPANY_INFO.name);
       expect(model.company.name).toBe('الأميرة للتوريدات والتجارة العامة');
-      expect(model.company.address).toBe('قنا - بجوار مركز شباب عزبة علام');
+      expect(model.company.address).toBe('قنا');
       expect(model.company.logoUrl).toBe('/logo.png');
-      expect(model.company.branches.qena.address).toBe('قنا - بجوار مركز شباب عزبة علام');
+      expect(model.company.branches.qena.address).toBe('قنا');
       expect(model.company.branches.hurghada.address).toBe('الغردقة - شيراتون');
       expect(model.company.branches.qena.phones).toEqual(['01008949310', '01001239995']);
       expect(model.company.branches.hurghada.phones).toEqual(['01001239995', '01020680007']);
@@ -208,6 +208,8 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
       render(<InvoicePrintCustomerInfo data={model} />);
 
+      expect(screen.getByText('بيانات العميل')).toBeInTheDocument();
+      expect(screen.queryByText('بيانات العميل المكرم')).not.toBeInTheDocument();
       expect(screen.getByText(mockCustomer.name)).toBeInTheDocument();
       expect(screen.getByText(mockCustomer.phone!)).toBeInTheDocument();
       expect(screen.getByText(mockCustomer.address!)).toBeInTheDocument();
@@ -276,7 +278,8 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
 
       // Branches verification
       expect(screen.getByText('فرع قنا')).toBeInTheDocument();
-      expect(screen.getByText('قنا - بجوار مركز شباب عزبة علام')).toBeInTheDocument();
+      expect(screen.getByText('قنا')).toBeInTheDocument();
+      expect(screen.queryByText('قنا - بجوار مركز شباب عزبة علام')).not.toBeInTheDocument();
       expect(screen.getByText('01008949310')).toBeInTheDocument();
       expect(screen.getAllByText('01001239995').length).toBeGreaterThanOrEqual(1);
 

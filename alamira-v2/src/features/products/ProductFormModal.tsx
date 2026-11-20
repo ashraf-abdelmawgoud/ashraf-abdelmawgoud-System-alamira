@@ -3,7 +3,13 @@ import { Plus } from 'lucide-react'
 import { Modal, Button, Input, Select } from '@/components/ui'
 import { Product, ProductFormData } from '@/types'
 import { useAuth } from '@/auth'
-import { getAllUnits, addCustomUnit } from '@/services/measurementUnitsService'
+import {
+  PREDEFINED_UNITS,
+  CUSTOM_UNIT_ACTION_VALUE,
+  CUSTOM_UNIT_ACTION_LABEL,
+  getCustomUnits,
+  addCustomUnit,
+} from '@/services/measurementUnitsService'
 
 export interface ProductFormModalProps {
   isOpen: boolean
@@ -20,13 +26,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   product,
   categories,
 }) => {
-  const { canViewCostPrice, currentUser } = useAuth()
+  const { canViewCostPrice } = useAuth()
   const canViewCost = canViewCostPrice
-  const isAdmin = currentUser?.role === 'ADMIN'
   const isEditing = Boolean(product)
 
-  const [availableUnits, setAvailableUnits] = useState<string[]>(() => getAllUnits())
-  const [showAddCustomUnit, setShowAddCustomUnit] = useState(false)
+  const [customUnits, setCustomUnits] = useState<string[]>(() => getCustomUnits())
+  const [isCustomMode, setIsCustomMode] = useState(false)
   const [customUnitInput, setCustomUnitInput] = useState('')
   const [customUnitError, setCustomUnitError] = useState('')
 
@@ -77,29 +82,30 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         is_active: true,
       })
     }
-    const all = getAllUnits()
-    if (product?.unit && !all.includes(product.unit)) {
-      setAvailableUnits([product.unit, ...all])
-    } else {
-      setAvailableUnits(all)
-    }
-    setShowAddCustomUnit(false)
+    setCustomUnits(getCustomUnits())
+    setIsCustomMode(false)
     setCustomUnitInput('')
     setCustomUnitError('')
     setErrors({})
   }, [product, categories, isOpen])
 
   const handleSaveCustomUnit = () => {
-    const res = addCustomUnit(customUnitInput)
+    const trimmed = customUnitInput.trim()
+    if (!trimmed) {
+      setCustomUnitError('يرجى كتابة اسم وحدة القياس')
+      return
+    }
+    const res = addCustomUnit(trimmed)
     if (!res.success) {
       setCustomUnitError(res.error || 'تعذر إضافة وحدة القياس')
       return
     }
-    setAvailableUnits(res.units)
-    setFormData((prev) => ({ ...prev, unit: res.unit || customUnitInput.trim() }))
+    const updated = getCustomUnits()
+    setCustomUnits(updated)
+    setFormData((prev) => ({ ...prev, unit: res.unit || trimmed }))
+    setIsCustomMode(false)
     setCustomUnitInput('')
     setCustomUnitError('')
-    setShowAddCustomUnit(false)
   }
 
   const validate = (): boolean => {
@@ -216,37 +222,79 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           </Select>
 
           <div className="space-y-1.5 text-right">
-            <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-neutral-700">وحدة القياس</label>
-              {isAdmin && !showAddCustomUnit && (
-                <button
-                  type="button"
-                  onClick={() => setShowAddCustomUnit(true)}
-                  className="text-xs text-[#0F766E] hover:text-[#115E59] font-bold flex items-center gap-1 transition-colors"
-                  title="إضافة وحدة قياس مخصصة للنظام"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>إضافة وحدة مخصصة</span>
-                </button>
-              )}
-            </div>
+            <Select
+              label="وحدة القياس *"
+              value={isCustomMode ? CUSTOM_UNIT_ACTION_VALUE : formData.unit}
+              onChange={(e) => {
+                const val = e.target.value
+                if (val === CUSTOM_UNIT_ACTION_VALUE) {
+                  setIsCustomMode(true)
+                  setCustomUnitInput('')
+                  setCustomUnitError('')
+                } else {
+                  setIsCustomMode(false)
+                  setCustomUnitError('')
+                  setFormData({ ...formData, unit: val })
+                }
+              }}
+              disabled={isSubmitting}
+            >
+              <optgroup label="الوحدات المعتمدة الافتراضية">
+                {PREDEFINED_UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </optgroup>
 
-            {showAddCustomUnit ? (
-              <div className="p-2.5 bg-teal-50/70 border border-teal-200 rounded-lg space-y-2">
+              {customUnits.length > 0 && (
+                <optgroup label="وحدات مخصصة مسجلة">
+                  {customUnits.map((u) => (
+                    <option key={u} value={u}>
+                      {u} (مخصصة)
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+
+              {/* Preserve existing/unknown product unit if not in predefined or custom */}
+              {formData.unit &&
+                !(PREDEFINED_UNITS as readonly string[]).includes(formData.unit) &&
+                !customUnits.includes(formData.unit) && (
+                  <optgroup label="الوحدة الحالية للصنف">
+                    <option value={formData.unit}>
+                      {formData.unit}
+                    </option>
+                  </optgroup>
+                )}
+
+              <optgroup label="خيارات إضافية">
+                <option value={CUSTOM_UNIT_ACTION_VALUE}>
+                  {CUSTOM_UNIT_ACTION_LABEL}
+                </option>
+              </optgroup>
+            </Select>
+
+            {isCustomMode && (
+              <div className="p-3 bg-teal-50/90 border border-teal-300 rounded-xl space-y-2 mt-2 shadow-xs transition-all">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-teal-900">إضافة وحدة قياس مخصصة</span>
+                  <span className="text-xs font-bold text-teal-950 flex items-center gap-1.5">
+                    <Plus className="w-3.5 h-3.5 text-teal-700" />
+                    <span>إدخال اسم وحدة القياس المخصصة</span>
+                  </span>
                   <button
                     type="button"
                     onClick={() => {
-                      setShowAddCustomUnit(false)
+                      setIsCustomMode(false)
+                      setCustomUnitInput('')
                       setCustomUnitError('')
                     }}
-                    className="text-xs text-neutral-500 hover:text-neutral-700"
+                    className="text-xs text-neutral-500 hover:text-neutral-700 underline"
                   >
-                    إلغاء
+                    إلغاء والعودة
                   </button>
                 </div>
-                <div className="flex gap-1.5">
+                <div className="flex gap-2">
                   <input
                     type="text"
                     value={customUnitInput}
@@ -254,8 +302,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       setCustomUnitInput(e.target.value)
                       setCustomUnitError('')
                     }}
-                    placeholder="مثال: شيكارة، درزن..."
-                    className="flex-1 p-1.5 text-xs border border-teal-300 rounded-md focus:ring-2 focus:ring-teal-500 bg-white"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleSaveCustomUnit()
+                      }
+                    }}
+                    placeholder="مثال: شيكارة، درزن، جالون، Box..."
+                    className="flex-1 p-2 text-xs border border-teal-300 rounded-lg focus:ring-2 focus:ring-teal-500 bg-white text-neutral-900 font-semibold"
                     autoFocus
                   />
                   <Button
@@ -263,27 +317,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     size="sm"
                     variant="primary"
                     onClick={handleSaveCustomUnit}
-                    className="bg-teal-700 hover:bg-teal-800 text-white text-xs px-2.5 py-1"
+                    className="bg-teal-700 hover:bg-teal-800 text-white text-xs px-3 py-1.5 shrink-0"
                   >
-                    حفظ
+                    تأكيد وإضافة
                   </Button>
                 </div>
                 {customUnitError && (
                   <p className="text-[11px] text-rose-600 font-bold">{customUnitError}</p>
                 )}
+                <p className="text-[10.5pt] sm:text-[11px] text-teal-900/80 leading-relaxed">
+                  سيتم حفظ هذه الوحدة وربطها بالصنف الحالي وإتاحتها للاستخدام في كافة أقسام النظام.
+                </p>
               </div>
-            ) : (
-              <Select
-                value={formData.unit}
-                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                disabled={isSubmitting}
-              >
-                {availableUnits.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-              </Select>
             )}
           </div>
         </div>
@@ -338,58 +383,55 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             }
             error={errors.min_stock_level}
             disabled={isSubmitting}
-            helperText="تنبيه النظام عند هبوط الرصيد لهذا الحد"
+            helperText="الحد الأدنى الذي يظهر عنده تحذير الرصيد المنخفض"
           />
 
           {!isEditing && (
             <Input
               type="number"
-              step={formData.allows_decimal_quantity ? 'any' : '1'}
+              step={formData.allows_decimal_quantity ? '0.001' : '1'}
               min="0"
               label="الرصيد الافتتاحي بالمخزن"
+              placeholder="0"
               value={formData.opening_quantity}
               onChange={(e) =>
                 setFormData({ ...formData, opening_quantity: parseFloat(e.target.value) || 0 })
               }
               error={errors.opening_quantity}
               disabled={isSubmitting}
-              helperText="الكمية المتوفرة حالياً عند تأسيس الصنف"
+              helperText="الكمية المتوفرة بالمخزن حالياً عند تسجيل الصنف"
             />
           )}
         </div>
 
+        {/* Decimal Quantity Flag */}
+        <div className="flex items-center gap-2 p-3 bg-neutral-50 rounded-xl border border-neutral-200/80">
+          <input
+            type="checkbox"
+            id="allows_decimal"
+            checked={formData.allows_decimal_quantity}
+            onChange={(e) => setFormData({ ...formData, allows_decimal_quantity: e.target.checked })}
+            className="w-4 h-4 text-emerald-600 rounded border-neutral-300 focus:ring-emerald-500"
+            disabled={isSubmitting}
+          />
+          <label htmlFor="allows_decimal" className="text-xs font-semibold text-neutral-800 cursor-pointer">
+            يسمح بكسور الكميات (أمتار، أوزان، إلخ)
+          </label>
+        </div>
+
         {/* Description / Notes */}
-        <Input
-          label="المواصفات الفنية أو الملاحظات"
-          placeholder="أدخل أية تفاصيل إضافية عن المنشأ أو الضمان..."
-          value={formData.description || ''}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          disabled={isSubmitting}
-        />
-
-        {/* Options */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-1">
-          <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-neutral-700">
-            <input
-              type="checkbox"
-              checked={formData.allows_decimal_quantity}
-              onChange={(e) =>
-                setFormData({ ...formData, allows_decimal_quantity: e.target.checked })
-              }
-              className="rounded border-neutral-300 text-emerald-600 focus:ring-emerald-500"
-            />
-            <span>يقبل كسور عشرية (مثل الأمتار أو الكيلوجرامات)</span>
+        <div>
+          <label className="block text-xs font-semibold text-neutral-700 mb-1">
+            وصف الصنف والمواصفات الفنية
           </label>
-
-          <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-neutral-700">
-            <input
-              type="checkbox"
-              checked={formData.is_active}
-              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-              className="rounded border-neutral-300 text-emerald-600 focus:ring-emerald-500"
-            />
-            <span>صنف نشط ومتاح في الفواتير</span>
-          </label>
+          <textarea
+            rows={3}
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            placeholder="مواصفات الصنف، بلد المنشأ، أو أي ملاحظات فنية تهم البيع والشراء..."
+            className="w-full p-2.5 text-xs rounded-lg border border-neutral-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+            disabled={isSubmitting}
+          />
         </div>
       </form>
     </Modal>

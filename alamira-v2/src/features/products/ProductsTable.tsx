@@ -43,7 +43,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
     if (stock <= min) {
       return (
         <Badge variant="warning" size="sm" dot>
-          {canViewExactStock ? `منخفض (${formatNumber(stock)})` : 'رصيد منخفض'}
+          {canViewExactStock ? `منخفض (${formatNumber(stock)} ${prod.unit})` : 'رصيد منخفض'}
         </Badge>
       )
     }
@@ -62,6 +62,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
             <TableHead>كود الصنف (SKU)</TableHead>
             <TableHead>اسم الصنف</TableHead>
             <TableHead>التصنيف</TableHead>
+            <TableHead className="text-center w-24">الوحدة</TableHead>
             <TableHead>سعر البيع</TableHead>
             {canViewCostPrice && <TableHead>سعر التكلفة</TableHead>}
             <TableHead>رصيد المخزن</TableHead>
@@ -84,6 +85,12 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
               <TableCell className="text-xs text-[#64748B]">
                 <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-medium">
                   {prod.category}
+                </span>
+              </TableCell>
+
+              <TableCell className="text-center">
+                <span className="inline-block px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-800 border border-neutral-200 text-xs font-semibold">
+                  {prod.unit || 'وحدة'}
                 </span>
               </TableCell>
 

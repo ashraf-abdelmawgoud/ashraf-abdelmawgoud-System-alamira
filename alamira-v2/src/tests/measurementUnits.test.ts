@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   PREDEFINED_UNITS,
+  CUSTOM_UNIT_ACTION_VALUE,
+  CUSTOM_UNIT_ACTION_LABEL,
   getAllUnits,
   getCustomUnits,
   addCustomUnit,
@@ -13,7 +15,7 @@ describe('Measurement Units & Custom Units Service (Task 3)', () => {
     localStorage.clear()
   })
 
-  it('includes all authoritative predefined Arabic measurement units', () => {
+  it('includes all authoritative predefined Arabic measurement units including شوال', () => {
     const requiredUnits = [
       'قطعة',
       'متر',
@@ -29,6 +31,7 @@ describe('Measurement Units & Custom Units Service (Task 3)', () => {
       'علبة',
       'كرتونة',
       'صندوق',
+      'شوال',
       'باكت',
       'رول',
       'لفة',
@@ -45,15 +48,21 @@ describe('Measurement Units & Custom Units Service (Task 3)', () => {
     }
   })
 
+  it('exports action constant for adding custom unit', () => {
+    expect(CUSTOM_UNIT_ACTION_VALUE).toBe('__OTHER_CUSTOM_UNIT__')
+    expect(CUSTOM_UNIT_ACTION_LABEL).toBe('أخرى — إضافة وحدة مخصصة')
+  })
+
   it('returns all predefined units when no custom units are stored', () => {
     const units = getAllUnits()
-    expect(units.length).toBeGreaterThanOrEqual(23)
+    expect(units.length).toBeGreaterThanOrEqual(24)
     expect(units).toContain('قطعة')
     expect(units).toContain('متر')
     expect(units).toContain('كرتونة')
+    expect(units).toContain('شوال')
   })
 
-  it('adds a valid custom unit and persists it to localStorage', () => {
+  it('adds a valid custom unit (Arabic or English) and persists it to localStorage', () => {
     const res = addCustomUnit('شيكارة')
     expect(res.success).toBe(true)
     expect(res.unit).toBe('شيكارة')
@@ -65,6 +74,11 @@ describe('Measurement Units & Custom Units Service (Task 3)', () => {
 
     const all = getAllUnits()
     expect(all).toContain('شيكارة')
+
+    // Add English unit
+    const resEn = addCustomUnit('Bundle')
+    expect(resEn.success).toBe(true)
+    expect(resEn.unit).toBe('Bundle')
   })
 
   it('prevents adding empty or whitespace-only custom units', () => {
@@ -75,6 +89,12 @@ describe('Measurement Units & Custom Units Service (Task 3)', () => {
     const resSpaces = addCustomUnit('   ')
     expect(resSpaces.success).toBe(false)
     expect(resSpaces.error).toBe('يرجى كتابة اسم وحدة القياس')
+  })
+
+  it('prevents invalid symbols in custom units', () => {
+    const resSpecial = addCustomUnit('***$$$')
+    expect(resSpecial.success).toBe(false)
+    expect(resSpecial.error).toContain('حروف عربية أو إنجليزية أو أرقام')
   })
 
   it('prevents duplicate measurement units (predefined and custom)', () => {
