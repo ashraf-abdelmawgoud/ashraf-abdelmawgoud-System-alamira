@@ -44,6 +44,31 @@ export interface AuthContextValue {
   canAccessRoute: (path: string) => boolean
 }
 
+/**
+ * Conclusively identifies whether an authentication error indicates an invalid/expired token
+ * versus a temporary network failure or connectivity timeout.
+ */
+function isConclusiveAuthError(err: unknown): boolean {
+  if (!err) return false
+  const errObj = err as { message?: string; status?: number; name?: string }
+  const msg = (errObj.message || '').toLowerCase()
+  const name = (errObj.name || '').toLowerCase()
+
+  if (
+    msg.includes('invalid_grant') ||
+    msg.includes('invalid refresh token') ||
+    msg.includes('refresh_token_not_found') ||
+    msg.includes('token has expired') ||
+    msg.includes('jwt expired') ||
+    name.includes('authsessionmissingerror') ||
+    errObj.status === 400 ||
+    errObj.status === 401
+  ) {
+    return true
+  }
+  return false
+}
+
 // Default value (Admin with full permissions) for seamless standalone test execution
 export const defaultAuthContextValue: AuthContextValue = {
   currentUser: MOCK_USERS.ADMIN,
@@ -131,7 +156,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         } = await supabase.auth.getSession()
 
         if (sessionError) {
-          throw sessionError
+          if (isConclusiveAuthError(sessionError)) {
+            console.warn('Conclusively invalid session detected, safely signing out:', sessionError)
+            try {
+              await supabase.auth.signOut()
+            } catch {
+              // Safe signout fallback
+            }
+          } else {
+            console.warn('Transient network/session error during restore. Preserving local tokens:', sessionError)
+          }
+          setIsAuthenticated(false)
+          if (isInitialBoot || !isBootstrappedRef.current) {
+            setIsLoadingAuth(false)
+          }
+          isBootstrappedRef.current = true
+          return
         }
 
         if (!session?.user) {
@@ -212,26 +252,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     // 1. Initial boot: checks session with full-screen loader
     syncRealSession({ isInitialBoot: true })
 
-    if (!isMock && isSupabaseConfigured()) {
-      const supabase = getSupabaseClient()
-      const authResponse = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_OUT' || !session) {
-          cacheService.clear()
-          setIsAuthenticated(false)
-          setCurrentUser(MOCK_USERS.ADMIN)
-          setIsLoadingAuth(false)
-        } else if (event === 'SIGNED_IN') {
-          // If a genuine sign-in event occurred, bootstrap if needed or sync profile in background
-          syncRealSession({ isInitialBoot: !isBootstrappedRef.current })
-        } else if (event === 'TOKEN_REFRESHED') {
-          // Token refreshed: ALWAYS in background without unmounting the application!
-          syncRealSession({ isInitialBoot: false })
-        }
-      })
-
-      return () => {
-        authResponse?.data?.subscription?.unsubscribe?.()
+    // Safety watchdog: ensure session loading never blocks the user interface indefinitely (12s mobile standard)
+    const watchdogTimer = setTimeout(() => {
+      if (!isBootstrappedRef.current) {
+        console.warn('[AuthContext] Session restore watchdog reached (12s). Unblocking UI while preserving state.')
+        setIsLoadingAuth(false)
+        isBootstrappedRef.current = true
       }
+    }, 12000)
+
+    let unsubscribe: (() => void) | undefined
+
+    if (!isMock && isSupabaseConfigured()) {
+      try {
+        const supabase = getSupabaseClient()
+        const authResponse = supabase.auth.onAuthStateChange(async (event, session) => {
+          try {
+            if (event === 'SIGNED_OUT' || !session) {
+              cacheService.clear()
+              setIsAuthenticated(false)
+              setCurrentUser(MOCK_USERS.ADMIN)
+              setIsLoadingAuth(false)
+            } else if (event === 'SIGNED_IN') {
+              syncRealSession({ isInitialBoot: !isBootstrappedRef.current })
+            } else if (event === 'TOKEN_REFRESHED') {
+              syncRealSession({ isInitialBoot: false })
+            }
+          } catch (listenerErr) {
+            console.error('[AuthContext] Auth state change handler error:', listenerErr)
+          }
+        })
+
+        unsubscribe = () => {
+          try {
+            authResponse?.data?.subscription?.unsubscribe?.()
+          } catch {
+            // Safe cleanup
+          }
+        }
+      } catch (clientErr) {
+        console.error('[AuthContext] Failed to initialize Supabase auth listener:', clientErr)
+      }
+    }
+
+    return () => {
+      clearTimeout(watchdogTimer)
+      unsubscribe?.()
     }
   }, [syncRealSession, isMock])
 

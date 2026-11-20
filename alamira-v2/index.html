@@ -2,6 +2,11 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
+    <!-- Anti-Caching Meta Directives for Mobile Browsers & PWAs -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
     <!-- Official Favicons & App Icons -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -26,9 +31,75 @@
       href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"
       rel="stylesheet"
     />
+
+    <!-- Stale-Bundle Auto-Recovery & Resource Error Interceptor -->
+    <script>
+      (function() {
+        function showStartupRecoveryUI(message) {
+          var root = document.getElementById('root');
+          if (root) {
+            root.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F5F7FA;font-family:sans-serif;direction:rtl;padding:20px;text-align:center;">' +
+              '<div style="background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:32px 24px;max-width:420px;width:100%;box-shadow:0 10px 25px -5px rgba(0,0,0,0.05);">' +
+              '<div style="width:48px;height:48px;border-radius:50%;background:#FEF2F2;color:#DC2626;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:24px;font-weight:bold;">!</div>' +
+              '<h2 style="font-size:18px;font-weight:bold;color:#11243A;margin:0 0 8px;">تحديث جديد في المنظومة</h2>' +
+              '<p style="font-size:13px;color:#64748B;line-height:1.6;margin:0 0 20px;">' + (message || 'تم نشر تحديث جديد للمنظومة. يرجى الضغط على الزر أدناه لتحديث الصفحة ومتابعة العمل.') + '</p>' +
+              '<button onclick="sessionStorage.removeItem(\'alamira_stale_asset_reload\');window.location.reload(true);" style="width:100%;background:#11243A;color:#fff;border:none;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;">تحديث الصفحة الآن</button>' +
+              '</div></div>';
+          }
+        }
+
+        // Global resource error capture
+        window.addEventListener('error', function(event) {
+          var target = event.target;
+          if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
+            var url = target.src || target.href || '';
+            if (url.indexOf('/assets/') !== -1) {
+              console.error('[Startup] Failed to load application bundle:', url);
+
+              // SAFETY: If the application has already mounted, NEVER auto-reload to protect unsaved form state!
+              var root = document.getElementById('root');
+              var isAppAlreadyMounted = root && root.children.length > 0 && !root.querySelector('#alamira-initial-loader');
+              if (isAppAlreadyMounted) {
+                console.warn('[Startup] Suppressing auto-reload because app is already mounted with active user state.');
+                return;
+              }
+
+              // Startup phase: Auto-reload ONCE via sessionStorage guard to prevent infinite loops
+              var reloadKey = 'alamira_stale_asset_reload';
+              if (!sessionStorage.getItem(reloadKey)) {
+                sessionStorage.setItem(reloadKey, '1');
+                window.location.reload(true);
+              } else {
+                showStartupRecoveryUI();
+              }
+            }
+          }
+        }, true);
+
+        // Watchdog: If initial loader remains in #root for over 10 seconds without React booting, show recovery UI
+        setTimeout(function() {
+          var root = document.getElementById('root');
+          if (root && root.querySelector('#alamira-initial-loader')) {
+            console.warn('[Startup] Initial loading shell stalled for 10s. Showing recovery UI.');
+            showStartupRecoveryUI('استغرق تشغيل المنظومة وقتاً أطول من المتوقع. يرجى إعادة المحاولة.');
+          }
+        }, 10000);
+      })();
+    </script>
   </head>
   <body class="bg-neutral-50 text-neutral-900 font-sans antialiased min-h-screen selection:bg-emerald-100 selection:text-emerald-900 overflow-x-hidden">
-    <div id="root"></div>
+    <div id="root">
+      <!-- Initial Loading Placeholder (Replaced automatically upon React mount) -->
+      <div id="alamira-initial-loader" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F5F7FA;font-family:'Cairo',sans-serif;direction:rtl;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px;color:#11243A;text-align:center;padding:20px;">
+          <div style="width:36px;height:36px;border:3px solid #CBD5E1;border-top-color:#11243A;border-radius:50%;animation:alamira-spin 0.8s linear infinite;"></div>
+          <span style="font-size:13px;font-weight:bold;color:#64748B;">جارٍ تشغيل منظومة الأميرة...</span>
+        </div>
+        <style>
+          @keyframes alamira-spin { to { transform: rotate(360deg); } }
+        </style>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
