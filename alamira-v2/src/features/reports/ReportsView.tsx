@@ -363,7 +363,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onNotification }) => {
           {/* 9. Printable Report Header (Print Media Only) */}
           <div className="hidden print:block pb-3 mb-3 border-b-2 border-[#11243A] text-right font-cairo">
             <h1 className="text-xl font-black text-[#11243A] mb-1">
-              شركة الأميرة للتوريدات العامة والتجارة
+              شركة الأميرة للتوريدات والتجارة العامة
             </h1>
             <h2 className="text-sm font-bold text-slate-700">{reportData.title}</h2>
             <div className="text-xs text-slate-500 font-mono mt-1">

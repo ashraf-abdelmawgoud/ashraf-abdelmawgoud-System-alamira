@@ -149,9 +149,9 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
       expect(model.company.name).toBe(OFFICIAL_COMPANY_INFO.name);
       expect(model.company.name).toBe('الأميرة للتوريدات والتجارة العامة');
-      expect(model.company.address).toBe('قنا');
+      expect(model.company.address).toBe('قنا - م الوقف');
       expect(model.company.logoUrl).toBe('/logo.png');
-      expect(model.company.branches.qena.address).toBe('قنا');
+      expect(model.company.branches.qena.address).toBe('قنا - م الوقف');
       expect(model.company.branches.hurghada.address).toBe('الغردقة - شيراتون');
       expect(model.company.branches.qena.phones).toEqual(['01008949310', '01001239995']);
       expect(model.company.branches.hurghada.phones).toEqual(['01001239995', '01020680007']);
@@ -241,9 +241,14 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(screen.getByText('1000.00 ج.م')).toBeInTheDocument();
     });
 
-    it('renders Totals table with conditional rows and Arabic Tafqeet', () => {
+    it('renders Totals table with conditional rows, Arabic Tafqeet, and automated approval statement', () => {
       const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
       render(<InvoicePrintTotals data={model} />);
+
+      // Authorized Approval Statement Box verification
+      expect(
+        screen.getByText('السادة / شركة الاميره للتوريدات والتجارة العامة توافق علي عرض اسعاركم آليا.')
+      ).toBeInTheDocument();
 
       expect(screen.getByText('إجمالي البضاعة:')).toBeInTheDocument();
       expect(screen.getByText('5000.00 ج.م')).toBeInTheDocument();
@@ -267,7 +272,7 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(screen.queryByText('شروط وملاحظات الفاتورة:')).not.toBeInTheDocument();
     });
 
-    it('renders Footer with 3 signatures boxes and 2 balanced branch columns without "الوقف"', () => {
+    it('renders Footer with 3 signatures boxes and 2 balanced branch columns with "قنا - م الوقف"', () => {
       const model = mapInvoiceToPrintModel(sampleInvoiceWithDiscounts, mockCustomer);
       render(<InvoicePrintFooter data={model} />);
 
@@ -278,7 +283,7 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
 
       // Branches verification
       expect(screen.getByText('فرع قنا')).toBeInTheDocument();
-      expect(screen.getByText('قنا')).toBeInTheDocument();
+      expect(screen.getByText('قنا - م الوقف')).toBeInTheDocument();
       expect(screen.queryByText('قنا - بجوار مركز شباب عزبة علام')).not.toBeInTheDocument();
       expect(screen.getByText('01008949310')).toBeInTheDocument();
       expect(screen.getAllByText('01001239995').length).toBeGreaterThanOrEqual(1);
@@ -286,9 +291,6 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(screen.getByText('فرع الغردقة')).toBeInTheDocument();
       expect(screen.getByText('الغردقة - شيراتون')).toBeInTheDocument();
       expect(screen.getByText('01020680007')).toBeInTheDocument();
-
-      // Verify "الوقف" is strictly absent
-      expect(screen.queryByText(/الوقف/)).not.toBeInTheDocument();
     });
 
     it('renders full InvoicePrintTemplate with A4 sheet layout', () => {
@@ -298,6 +300,50 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       const sheet = container.querySelector('.invoice-sheet');
       expect(sheet).toBeInTheDocument();
       expect(sheet).toHaveAttribute('dir', 'rtl');
+    });
+
+    it('handles long invoices with 12 items with stable pagination and break-inside avoidance', () => {
+      const longItems = Array.from({ length: 12 }, (_, i) => ({
+        id: `item-${i + 1}`,
+        invoice_id: 'inv-long',
+        product_id: `prod-${i + 1}`,
+        product_sku_snapshot: `SKU-${1000 + i}`,
+        product_name_snapshot: `منتج تجاري اختباري رقم ${i + 1}`,
+        unit_snapshot: i % 2 === 0 ? 'قطعة' : 'شوال',
+        quantity: i + 1,
+        unit_price: 150,
+        discount_type: 'fixed' as const,
+        discount_value: 0,
+        discount_amount: 0,
+        gross_amount: (i + 1) * 150,
+        net_amount: (i + 1) * 150,
+      }));
+
+      const longInvoice: SalesInvoice = {
+        ...sampleInvoiceWithoutDiscounts,
+        id: 'inv-long',
+        invoice_number: 'INV-LONG-001',
+        items: longItems,
+        gross_amount: longItems.reduce((acc, it) => acc + it.gross_amount, 0),
+        subtotal: longItems.reduce((acc, it) => acc + it.gross_amount, 0),
+        final_total: longItems.reduce((acc, it) => acc + it.gross_amount, 0),
+      };
+
+      const model = mapInvoiceToPrintModel(longInvoice, mockCustomer);
+      const { container } = render(<InvoicePrintTemplate data={model} />);
+
+      const rows = container.querySelectorAll('.print-table tbody tr');
+      expect(rows.length).toBe(12);
+
+      // Verify each row has break-inside-avoid for clean A4 printing
+      rows.forEach((row) => {
+        expect(row).toHaveClass('break-inside-avoid');
+      });
+
+      // Verify approval statement is rendered below long list
+      expect(
+        screen.getByText('السادة / شركة الاميره للتوريدات والتجارة العامة توافق علي عرض اسعاركم آليا.')
+      ).toBeInTheDocument();
     });
   });
 

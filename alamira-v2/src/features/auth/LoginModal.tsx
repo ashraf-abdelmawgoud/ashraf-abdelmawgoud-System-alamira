@@ -51,7 +51,7 @@ export const LoginModal: React.FC = () => {
           <div className="mx-auto inline-flex items-center justify-center bg-white px-5 py-2.5 rounded-xl shadow-md border border-slate-200/80 mb-3.5">
             <AppLogo size="lg" className="h-9 sm:h-11 w-auto" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight">الأميرة للتوريدات العامة والتجارة</h1>
+          <h1 className="text-xl font-bold">الأميرة للتوريدات والتجارة العامة</h1>
           <p className="text-xs text-slate-300 mt-1 font-medium">
             تسجيل الدخول الموحد — منظومة إدارة المبيعات والمخازن V2
           </p>

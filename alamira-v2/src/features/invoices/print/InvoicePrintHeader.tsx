@@ -29,13 +29,13 @@ export const InvoicePrintHeader: React.FC<InvoicePrintHeaderProps> = ({ data }) 
               onError={() => setLogoError(true)}
             />
           ) : (
-            <h1 className="text-xl font-black text-[#0a192f] tracking-tight m-0">
+            <h1 className="text-xl font-black text-[#0a192f] m-0">
               {data.company.name}
             </h1>
           )}
         </div>
         {/* Company Name below logo */}
-        <div className="text-[10pt] font-black text-[#0a192f] tracking-tight leading-snug">
+        <div className="text-[10pt] font-black text-[#0a192f] leading-snug">
           {data.company.name}
         </div>
       </div>
@@ -48,13 +48,13 @@ export const InvoicePrintHeader: React.FC<InvoicePrintHeaderProps> = ({ data }) 
         <div className="doc-meta text-[8.5pt] font-bold text-[#334155] space-y-1.5 pt-0.5">
           <div className="flex justify-between items-center gap-2">
             <span className="text-[#64748b]">رقم الفاتورة:</span>
-            <strong className="text-[#0a192f] font-mono text-[9pt] tracking-wide">
+            <strong className="text-[#0a192f] font-mono text-[9pt]" dir="ltr">
               {data.invoice.invoiceNumber}
             </strong>
           </div>
           <div className="flex justify-between items-center gap-2 pt-1 border-t border-[#e2e8f0]">
             <span className="text-[#64748b]">تاريخ التحرير:</span>
-            <strong className="text-[#0a192f] tabular-nums font-mono text-[8.5pt]">
+            <strong className="text-[#0a192f] tabular-nums font-mono text-[8.5pt]" dir="ltr">
               {data.invoice.invoiceDate}
             </strong>
           </div>

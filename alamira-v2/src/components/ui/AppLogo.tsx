@@ -20,7 +20,7 @@ const sizeClasses: Record<Exclude<LogoSize, 'custom'>, { img: string; width: num
 }
 
 /**
- * Official AppLogo Component for Al-Amira General Supplies & Trading (شركة الأميرة للتوريدات العامة والتجارة)
+ * Official AppLogo Component for Al-Amira General Supplies & Trading (شركة الأميرة للتوريدات والتجارة العامة)
  * 
  * Guarantees:
  * - Aspect ratio preservation (no stretch or squashing).
@@ -35,7 +35,7 @@ export const AppLogo: React.FC<AppLogoProps> = ({
   withBadge = false,
   badgeClassName,
   className,
-  alt = 'شعار شركة الأميرة للتوريدات العامة والتجارة — Al-Amira',
+  alt = 'شعار شركة الأميرة للتوريدات والتجارة العامة — Al-Amira',
   loading = 'eager',
   decoding = 'async',
   ...props

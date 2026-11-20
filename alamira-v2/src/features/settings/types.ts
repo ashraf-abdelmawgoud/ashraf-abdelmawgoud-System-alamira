@@ -9,10 +9,10 @@ export interface CompanyProfile {
 }
 
 export const OFFICIAL_COMPANY_PROFILE_DEFAULT: CompanyProfile = {
-  name: 'الأميرة للتوريدات العامة والتجارة',
+  name: 'الأميرة للتوريدات والتجارة العامة',
   activity: 'توريدات عمومية وتجارة - استيراد وتصدير وتوكيلات',
   phone: '01012345678',
-  address: 'قنا – الوقف – بجوار مركز شباب عزبة علام',
+  address: 'قنا - م الوقف',
   commercial_reg: '105423',
   tax_id: '450-892-110',
   notes: 'نسعد دائماً بخدمتكم وتوفير أفضل العروض والمنتجات المعمارية والتجارية.',

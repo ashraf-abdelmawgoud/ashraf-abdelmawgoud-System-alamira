@@ -220,10 +220,16 @@
     margin: 8mm 10mm 10mm 10mm;
   }
 
+  *, *::before, *::after {
+    letter-spacing: normal !important;
+  }
+
   body {
     background: #ffffff !important;
     color: #0f172a !important;
-    font-family: 'Cairo', system-ui, -apple-system, sans-serif !important;
+    font-family: 'Cairo', 'Segoe UI', Tahoma, system-ui, -apple-system, sans-serif !important;
+    direction: rtl !important;
+    text-align: right !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -243,5 +249,15 @@
     min-height: auto !important;
     padding: 0 !important;
     margin: 0 !important;
+    letter-spacing: normal !important;
+  }
+
+  tr, .print-card-box, .print-doc-badge, .print-bottom-container, .print-footer-container, .print-sign-box, .print-approval-statement-box {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  thead {
+    display: table-header-group !important;
   }
 }

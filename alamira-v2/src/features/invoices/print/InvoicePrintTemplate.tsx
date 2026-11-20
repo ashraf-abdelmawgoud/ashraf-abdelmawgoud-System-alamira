@@ -19,15 +19,20 @@ export const InvoicePrintTemplate = forwardRef<HTMLDivElement, InvoicePrintTempl
         ref={ref}
         id={isPrintMode ? 'print-area' : undefined}
         dir="rtl"
+        lang="ar"
         className={`invoice-sheet bg-white text-[#0f172a] box-border select-text font-sans ${
           isPrintMode
             ? 'w-full print:block p-0'
-            : 'w-[210mm] min-h-[297mm] p-[12mm_15mm] mx-auto shadow-xl rounded-xs'
+            : 'w-[210mm] min-h-[297mm] p-[10mm_12mm] mx-auto shadow-xl rounded-xs'
         } ${className}`}
         style={{
-          fontFamily: "'Cairo', system-ui, -apple-system, sans-serif",
-          fontSize: '9.5pt',
-          lineHeight: '1.45',
+          fontFamily: "'Cairo', 'Tajawal', 'Segoe UI', Tahoma, system-ui, -apple-system, sans-serif",
+          fontSize: '9.2pt',
+          lineHeight: '1.42',
+          letterSpacing: 'normal',
+          textRendering: 'geometricPrecision',
+          direction: 'rtl',
+          textAlign: 'right',
           backgroundColor: '#ffffff',
           color: '#0f172a',
         }}

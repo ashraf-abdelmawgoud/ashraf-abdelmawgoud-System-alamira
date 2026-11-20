@@ -118,6 +118,22 @@ export async function exportInvoicePng(
         if (clonedDoc.defaultView) {
           wrapWindowGCS(clonedDoc.defaultView);
         }
+
+        // Ensure cloned invoice sheet has natural scale and uncorrupted Arabic typography
+        const clonedSheet = clonedDoc.querySelector('.invoice-sheet') as HTMLElement | null;
+        if (clonedSheet) {
+          clonedSheet.style.transform = 'none';
+          clonedSheet.style.letterSpacing = 'normal';
+          clonedSheet.style.direction = 'rtl';
+          clonedSheet.style.textAlign = 'right';
+          clonedSheet.style.fontFamily = "'Cairo', 'Segoe UI', Tahoma, sans-serif";
+        }
+
+        // Force letter-spacing normal across all cloned elements to preserve Arabic cursive ligatures in html2canvas
+        const allTextElements = clonedDoc.querySelectorAll('.invoice-sheet *');
+        allTextElements.forEach((el) => {
+          (el as HTMLElement).style.letterSpacing = 'normal';
+        });
       },
     });
 

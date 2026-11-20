@@ -66,12 +66,12 @@ export interface InvoicePrintModel {
 export const OFFICIAL_COMPANY_INFO: InvoicePrintCompanyModel = {
   name: 'الأميرة للتوريدات والتجارة العامة',
   subtitle: 'توريدات عمومية وتجارة - استيراد وتصدير وتوكيلات',
-  address: 'قنا',
+  address: 'قنا - م الوقف',
   logoUrl: '/logo.png',
   branches: {
     qena: {
       name: 'فرع قنا',
-      address: 'قنا',
+      address: 'قنا - م الوقف',
       phones: ['01008949310', '01001239995'],
     },
     hurghada: {

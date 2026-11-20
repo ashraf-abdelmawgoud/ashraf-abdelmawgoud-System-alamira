@@ -28,11 +28,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigate }) => {
           <AppLogo
             size="md"
             className="h-8 w-auto"
-            alt="شعار شركة الأميرة للتوريدات العامة والتجارة — Al-Amira"
+            alt="شعار شركة الأميرة للتوريدات والتجارة العامة — Al-Amira"
           />
         </div>
-        <div className="mt-2 text-[11px] font-bold text-slate-300 tracking-wide truncate">
-          الأميرة للتوريدات العامة والتجارة
+        <div className="mt-2 text-[11.5px] font-bold text-slate-200 text-center leading-snug">
+          الأميرة للتوريدات والتجارة العامة
         </div>
       </div>
 

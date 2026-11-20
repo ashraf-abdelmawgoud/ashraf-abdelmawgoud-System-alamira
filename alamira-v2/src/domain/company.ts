@@ -10,9 +10,9 @@ export interface CompanyProfile {
 }
 
 export const AL_AMIRA_COMPANY: CompanyProfile = {
-  name: 'الأميرة للتوريدات العامة والتجارة',
+  name: 'الأميرة للتوريدات والتجارة العامة',
   subTitle: 'نظام إدارة المبيعات والمخزون المطور',
-  address: 'قنا – الوقف – بجوار مركز شباب عزبة علام',
+  address: 'قنا - م الوقف',
   city: 'قنا',
   country: 'جمهورية مصر العربية',
 }

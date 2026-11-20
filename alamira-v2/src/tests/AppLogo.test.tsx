@@ -5,7 +5,7 @@ import { AppLogo } from '@/components/ui'
 describe('AppLogo Component & Brand Asset Verification', () => {
   it('1. Renders default logo with official image source and accessibility alt text', () => {
     render(<AppLogo />)
-    const img = screen.getByRole('img', { name: /شركة الأميرة للتوريدات العامة والتجارة/i })
+    const img = screen.getByRole('img', { name: /شركة الأميرة للتوريدات والتجارة العامة/i })
 
     expect(img).toBeInTheDocument()
     expect(img).toHaveAttribute('src', '/logo.png')

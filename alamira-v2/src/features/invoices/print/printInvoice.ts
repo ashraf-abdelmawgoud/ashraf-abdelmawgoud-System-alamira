@@ -43,18 +43,27 @@ export function printInvoice(element: HTMLElement | null): boolean {
       <html dir="rtl" lang="ar">
         <head>
           <meta charset="utf-8">
-          <title>طباعة فاتورة مبيعات - شركة الأميرة</title>
+          <title>طباعة بيان أسعار - شركة الأميرة للتوريدات والتجارة العامة</title>
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+          <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
           <style>
             @page {
               size: A4 portrait;
               margin: 8mm 10mm 10mm 10mm;
+            }
+            * {
+              letter-spacing: normal !important;
+              box-sizing: border-box;
             }
             body {
               margin: 0;
               padding: 0;
               background: #ffffff !important;
               color: #0f172a !important;
-              font-family: 'Cairo', system-ui, -apple-system, sans-serif !important;
+              font-family: 'Cairo', 'Segoe UI', Tahoma, system-ui, -apple-system, sans-serif !important;
+              direction: rtl !important;
+              text-align: right !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
@@ -64,6 +73,14 @@ export function printInvoice(element: HTMLElement | null): boolean {
               min-height: auto !important;
               padding: 0 !important;
               margin: 0 !important;
+              letter-spacing: normal !important;
+            }
+            tr, .print-card-box, .print-doc-badge, .print-bottom-container, .print-footer-container, .print-sign-box, .print-approval-statement-box {
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
+            }
+            thead {
+              display: table-header-group !important;
             }
           </style>
           ${styles}
@@ -75,7 +92,7 @@ export function printInvoice(element: HTMLElement | null): boolean {
     `);
     frameDoc.close();
 
-    setTimeout(() => {
+    const triggerPrint = () => {
       try {
         iframe.contentWindow?.focus();
         iframe.contentWindow?.print();
@@ -89,7 +106,19 @@ export function printInvoice(element: HTMLElement | null): boolean {
           }
         }, 1500);
       }
-    }, 400);
+    };
+
+    if (frameDoc.fonts && frameDoc.fonts.ready) {
+      frameDoc.fonts.ready
+        .then(() => {
+          setTimeout(triggerPrint, 150);
+        })
+        .catch(() => {
+          setTimeout(triggerPrint, 350);
+        });
+    } else {
+      setTimeout(triggerPrint, 400);
+    }
 
     return true;
   } catch (err) {

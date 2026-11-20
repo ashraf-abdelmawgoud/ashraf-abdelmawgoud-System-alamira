@@ -12,9 +12,20 @@ export const InvoicePrintTotals: React.FC<InvoicePrintTotalsProps> = ({ data }) 
     <div className="print-bottom-container flex justify-between items-start gap-3.5 mt-2.5 break-inside-avoid">
       {/* Notes and Tafqeet Column */}
       <div className="print-notes-column flex-1">
+        {/* Tafqeet Amount in Words */}
         <div className="print-tafqeet-box bg-[#f8fafc] border-[1.5px] border-[#cbd5e1] border-r-4 border-r-[#c59b27] rounded-sm p-2 text-[8.8pt] font-bold text-[#0f172a] leading-relaxed">
           <span className="text-[#64748b]">المبلغ بالحروف: </span>
           <strong className="text-[#0a192f]">{totals.tafqeetText}</strong>
+        </div>
+
+        {/* Authorized Automated Approval Statement Box (Directly below Amount in Words) */}
+        <div className="print-approval-statement-box mt-2 bg-[#f0f4f8] border-[1.5px] border-[#11243A]/30 border-r-4 border-r-[#11243A] rounded-sm p-2 text-[8.5pt] font-bold text-[#0a192f] leading-relaxed relative overflow-hidden">
+          <div className="flex items-center gap-1.5 text-right" dir="rtl">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#c59b27] shrink-0" />
+            <span className="select-text">
+              السادة / شركة الاميره للتوريدات والتجارة العامة توافق علي عرض اسعاركم آليا.
+            </span>
+          </div>
         </div>
 
         {invoice.notes && (
