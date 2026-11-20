@@ -55,6 +55,20 @@ describe('Supabase Client Configuration & Gateway', () => {
     expect(dataService.isMock()).toBe(true)
   })
 
+  it('guarantees production builds do not fall back to mock mode even if VITE_ENABLE_MOCK_DATA is true', () => {
+    vi.stubEnv('PROD', true)
+    vi.stubEnv('VITE_ENABLE_MOCK_DATA', 'true')
+    vi.stubEnv('VITE_USE_MOCK', 'true')
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://llmptlkvatndvrmnjiyj.supabase.co')
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'test-anon-key')
+    try {
+      expect(isSupabaseConfigured()).toBe(true)
+      expect(isMockMode()).toBe(false)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   it('guarantees dataService does not silently fall back to mock on real backend failure', async () => {
     // When isRealBackendActive is simulated
     const originalIsMock = dataService.isMock
@@ -751,6 +765,62 @@ describe('Phase G: Immutable Audit Logging', () => {
           adminUser
         )
       ).rejects.toThrow('كلمة المرور مطلوبة ويجب أن تتكون من 8 أحرف على الأقل')
+    })
+
+    it('propagates 403 authorization denial from Edge Function with clear ADMIN requirement message', async () => {
+      const mockClient = getSupabaseClient() as any
+      mockClient.functions.invoke.mockResolvedValueOnce({
+        data: null,
+        error: {
+          message: 'Edge Function returned a non-2xx status code',
+          context: {
+            json: async () => ({
+              error: 'غير مصرح: إنشاء حسابات مسؤولي المبيعات مقتصر حصراً على مدير النظام النشط (ADMIN)',
+              code: 'FORBIDDEN_NOT_ADMIN',
+            }),
+          },
+        },
+      })
+
+      await expect(
+        supabaseDataService.createSalesOperator(
+          {
+            full_name: 'طارق العبد',
+            email: 'tarek@alamira.com',
+            username: 'tarek_sales',
+            password: 'ValidPassword123!',
+          },
+          adminUser
+        )
+      ).rejects.toThrow('غير مصرح: إنشاء حسابات مسؤولي المبيعات مقتصر حصراً على مدير النظام النشط (ADMIN)')
+    })
+
+    it('propagates 500 database query error from Edge Function without mislabeling as 403 permission error', async () => {
+      const mockClient = getSupabaseClient() as any
+      mockClient.functions.invoke.mockResolvedValueOnce({
+        data: null,
+        error: {
+          message: 'Edge Function returned a non-2xx status code',
+          context: {
+            json: async () => ({
+              error: 'فشل التحقق من صلاحيات المستخدم في قاعدة البيانات (Database Authorization Query Failed)',
+              code: 'AUTHZ_DB_ERROR',
+            }),
+          },
+        },
+      })
+
+      await expect(
+        supabaseDataService.createSalesOperator(
+          {
+            full_name: 'هشام فؤاد',
+            email: 'hesham@alamira.com',
+            username: 'hesham_sales',
+            password: 'ValidPassword123!',
+          },
+          adminUser
+        )
+      ).rejects.toThrow('فشل التحقق من صلاحيات المستخدم في قاعدة البيانات')
     })
   })
 })

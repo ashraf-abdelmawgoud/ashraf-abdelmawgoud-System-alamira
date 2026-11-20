@@ -61,7 +61,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
       <div className="border border-neutral-200 rounded-xl overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-right text-xs">
-            <thead className="bg-neutral-100 text-neutral-700 font-bold border-b border-neutral-200">
+            <thead className="bg-neutral-100 text-neutral-700 font-bold border-b border-neutral-200 hidden md:table-header-group">
               <tr>
                 <th className="p-3 w-4/12 min-w-[200px]">الصنف المطلوب</th>
                 <th className="p-3 w-1/12 text-center min-w-[70px]">الوحدة</th>
@@ -74,7 +74,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100 bg-white">
+            <tbody className="divide-y divide-neutral-100 bg-white md:divide-y">
               {items.map((row, idx) => {
                 const prod = products.find((p) => p.id === row.productId)
                 const calc = calculatedItems[idx] || {
@@ -87,9 +87,29 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                 const allowsDec = Boolean(prod?.allows_decimal_quantity)
 
                 return (
-                  <tr key={idx} className="hover:bg-neutral-50/70 transition-colors">
+                  <tr
+                    key={idx}
+                    className="block md:table-row p-3.5 mb-3 rounded-xl border border-neutral-200 md:border-0 bg-neutral-50/40 md:bg-white hover:bg-neutral-50/70 transition-colors"
+                  >
                     {/* 1. Product selector & stock badge */}
-                    <td className="p-2.5">
+                    <td className="block md:table-cell p-0 md:p-2.5 mb-2.5 md:mb-0">
+                      <div className="flex items-center justify-between md:hidden mb-1.5">
+                        <span className="font-bold text-neutral-700 text-xs">
+                          بند #{idx + 1}
+                        </span>
+                        {!isApprovedContext && (
+                          <button
+                            type="button"
+                            onClick={() => onRemoveItem(idx)}
+                            disabled={items.length <= 1}
+                            className="text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:pointer-events-none p-1"
+                            title="حذف البند"
+                            aria-label="حذف البند"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                       <select
                         value={row.productId}
                         onChange={(e) => {
@@ -140,14 +160,17 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                     </td>
 
                     {/* 2. Unit */}
-                    <td className="p-2.5 text-center">
+                    <td className="hidden md:table-cell p-2.5 text-center">
                       <span className="px-2 py-1 bg-neutral-100 text-neutral-700 text-xs rounded-md font-semibold">
                         {prod ? prod.unit : '--'}
                       </span>
                     </td>
 
                     {/* 3. Quantity */}
-                    <td className="p-2.5">
+                    <td className="block md:table-cell p-0 md:p-2.5 mb-2 md:mb-0">
+                      <span className="md:hidden block text-[11px] font-bold text-neutral-600 mb-1">
+                        الكمية المطلوبة {prod ? `(${prod.unit})` : ''}:
+                      </span>
                       <input
                         type="number"
                         inputMode="decimal"
@@ -174,7 +197,10 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                     </td>
 
                     {/* 4. Unit Price */}
-                    <td className="p-2.5">
+                    <td className="block md:table-cell p-0 md:p-2.5 mb-2 md:mb-0">
+                      <span className="md:hidden block text-[11px] font-bold text-neutral-600 mb-1">
+                        سعر البيع (ج.م):
+                      </span>
                       <input
                         type="number"
                         inputMode="decimal"
@@ -191,7 +217,10 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                     </td>
 
                     {/* 5. Line Item Discount */}
-                    <td className="p-2.5">
+                    <td className="block md:table-cell p-0 md:p-2.5 mb-2.5 md:mb-0">
+                      <span className="md:hidden block text-[11px] font-bold text-neutral-600 mb-1">
+                        خصم البند:
+                      </span>
                       <div className="flex gap-1.5 items-center">
                         <select
                           value={row.discountType}
@@ -200,7 +229,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                               discountType: e.target.value as InvoiceDiscountType,
                             })
                           }
-                          className="w-24 p-1.5 border border-neutral-300 rounded-lg text-xs bg-white"
+                          className="flex-1 md:w-24 p-1.5 border border-neutral-300 rounded-lg text-xs bg-white"
                           disabled={isApprovedContext}
                         >
                           <option value="none">بدون خصم</option>
@@ -218,7 +247,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                               discountValue: parseFloat(e.target.value) || 0,
                             })
                           }
-                          className="w-16 p-1.5 border border-neutral-300 rounded-lg text-xs text-center tabular-nums"
+                          className="w-20 md:w-16 p-1.5 border border-neutral-300 rounded-lg text-xs text-center tabular-nums"
                           disabled={row.discountType === 'none' || isApprovedContext}
                         />
                       </div>
@@ -230,13 +259,18 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                     </td>
 
                     {/* 6. Net Amount */}
-                    <td className="p-2.5 text-center font-bold text-emerald-800 whitespace-nowrap text-sm">
-                      {formatCurrency(calc.netAmount)}
+                    <td className="block md:table-cell p-2 md:p-2.5 bg-emerald-50/60 md:bg-transparent rounded-lg md:rounded-none">
+                      <div className="flex items-center justify-between md:justify-center">
+                        <span className="md:hidden text-xs font-bold text-neutral-700">صافي البند:</span>
+                        <span className="font-bold text-emerald-800 whitespace-nowrap text-sm">
+                          {formatCurrency(calc.netAmount)}
+                        </span>
+                      </div>
                     </td>
 
                     {/* 7. Delete Row */}
                     {!isApprovedContext && (
-                      <td className="p-2.5 text-center">
+                      <td className="hidden md:table-cell p-2.5 text-center">
                         <button
                           type="button"
                           onClick={() => onRemoveItem(idx)}

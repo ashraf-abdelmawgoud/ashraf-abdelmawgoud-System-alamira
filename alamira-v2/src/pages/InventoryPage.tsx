@@ -45,8 +45,6 @@ export const InventoryPage: React.FC = () => {
     setTimeout(() => setNotification(null), 4000)
   }
 
-  const isMock = dataService.isMock()
-
   const loadAllData = useCallback(async () => {
     setLoading(true)
     try {
@@ -200,11 +198,6 @@ export const InventoryPage: React.FC = () => {
 
       {activeTab === 'receipts' && (
         <div className="space-y-4">
-          {!isMock && (
-            <div className="bg-blue-50 border border-blue-200 text-blue-900 px-4 py-3 rounded-lg text-sm">
-              ℹ️ <strong>ملاحظة تشغيلية:</strong> أذون الاستلام المخزنية اليدوية مجدولة للربط السحابي في المرحلة القادمة. يتم تسجيل حركات المخزن وتحديث الأرصدة تلقائياً عبر فواتير المبيعات المعتمدة، ويمكن متابعتها من تبويب &quot;سجل الحركات&quot;.
-            </div>
-          )}
           <ReceiptsList
             receipts={receipts}
             products={products}
@@ -217,11 +210,6 @@ export const InventoryPage: React.FC = () => {
 
       {activeTab === 'issues' && (
         <div className="space-y-4">
-          {!isMock && (
-            <div className="bg-blue-50 border border-blue-200 text-blue-900 px-4 py-3 rounded-lg text-sm">
-              ℹ️ <strong>ملاحظة تشغيلية:</strong> أذون الصرف المخزنية اليدوية مجدولة للربط السحابي في المرحلة القادمة. يتم صرف المخزون وتحديث الأرصدة تلقائياً عبر فواتير المبيعات المعتمدة، ويمكن متابعتها من تبويب &quot;سجل الحركات&quot;.
-            </div>
-          )}
           <IssuesList
             issues={issues}
             products={products}
@@ -233,11 +221,6 @@ export const InventoryPage: React.FC = () => {
 
       {activeTab === 'adjustments' && (
         <div className="space-y-4">
-          {!isMock && (
-            <div className="bg-blue-50 border border-blue-200 text-blue-900 px-4 py-3 rounded-lg text-sm">
-              ℹ️ <strong>ملاحظة تشغيلية:</strong> تسويات الجرد المخزنية اليدوية مجدولة للربط السحابي في المرحلة القادمة.
-            </div>
-          )}
           <AdjustmentsList
             adjustments={adjustments}
             products={products}

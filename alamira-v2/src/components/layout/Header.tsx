@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Menu, Calendar, User, Database, ArrowLeftRight, LogOut, CheckCircle2, Loader2 } from 'lucide-react'
+import { Menu, Calendar, User, ArrowLeftRight, LogOut, Loader2 } from 'lucide-react'
 import { formatDate } from '@/lib/formatters'
 import { useAuth } from '@/auth'
 import { AppLogo } from '@/components/ui'
@@ -27,23 +27,23 @@ export const Header: React.FC<HeaderProps> = ({
   }
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 w-full items-center justify-between border-b border-[#D9E2EC] bg-white px-3 sm:px-6 shrink-0 shadow-xs flex-nowrap">
+    <header className="sticky top-0 z-20 flex h-14 w-full items-center justify-between border-b border-[#D9E2EC] bg-white px-2.5 sm:px-6 shrink-0 shadow-xs flex-nowrap">
       {/* Right side: Mobile Menu Button, Brand Identity & Page Title */}
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-nowrap">
+      <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-nowrap flex-1 sm:flex-initial">
         <button
           type="button"
           onClick={onOpenMobileMenu}
-          className="inline-flex lg:hidden items-center justify-center rounded-lg p-1.5 text-[#11243A] hover:text-[#11243A] hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
+          className="inline-flex lg:hidden items-center justify-center rounded-lg p-2 sm:p-1.5 text-[#11243A] hover:text-[#11243A] hover:bg-slate-100 transition-colors shrink-0 cursor-pointer min-h-[36px] min-w-[36px]"
           aria-label="فتح القائمة الرئيسية"
         >
           <Menu className="w-5 h-5" />
         </button>
 
         {/* Mobile Brand Logo with Clean Separator */}
-        <div className="flex lg:hidden items-center pl-2 sm:pl-3 border-l border-slate-200 shrink-0">
+        <div className="flex lg:hidden items-center pl-1.5 sm:pl-3 border-l border-slate-200 shrink-0">
           <AppLogo
             size="xs"
-            className="h-5 w-auto max-w-[68px] sm:max-w-[85px] object-contain"
+            className="h-4.5 sm:h-5 w-auto max-w-[56px] sm:max-w-[85px] object-contain"
           />
         </div>
 
@@ -53,21 +53,8 @@ export const Header: React.FC<HeaderProps> = ({
         </h1>
       </div>
 
-      {/* Left side: Date, Connection Indicator & User Profile */}
-      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 flex-nowrap">
-        {/* Connection Mode Indicator */}
-        {isMock ? (
-          <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F8FAFC] text-slate-700 border border-[#D9E2EC] text-[11px] font-medium">
-            <Database className="w-3.5 h-3.5 text-[#11243A]" />
-            <span>بيانات تجريبية</span>
-          </div>
-        ) : (
-          <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-semibold">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>متصل بـ Supabase</span>
-          </div>
-        )}
-
+      {/* Left side: Date & User Profile */}
+      <div className="flex items-center gap-1 sm:gap-3 shrink-0 flex-nowrap">
         {/* Date Display */}
         <div className="hidden md:flex items-center gap-1.5 text-xs text-[#64748B] bg-[#F8FAFC] border border-[#D9E2EC] rounded-md px-2.5 py-1 font-medium">
           <Calendar className="w-3.5 h-3.5 text-[#64748B]" />
@@ -75,15 +62,15 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Interactive User Profile & Actions */}
-        <div className="flex items-center gap-1.5 sm:gap-2 rounded-md bg-[#F8FAFC] border border-[#D9E2EC] px-1.5 sm:px-2 py-1">
+        <div className="flex items-center gap-1 sm:gap-2 rounded-md bg-[#F8FAFC] border border-[#D9E2EC] px-1 sm:px-2 py-0.5 sm:py-1">
           <div
-            className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-[#11243A] text-white font-bold text-xs border border-slate-300 shrink-0"
+            className="flex h-6.5 w-6.5 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-[#11243A] text-white font-bold text-xs border border-slate-300 shrink-0"
             title={`${currentUser.name} (${currentUser.role === 'ADMIN' ? 'مدير النظام' : 'مسؤول مبيعات'})`}
           >
             <User className="w-3.5 h-3.5" />
           </div>
           <div className="hidden sm:flex flex-col text-right">
-            <span className="text-xs font-semibold text-[#11243A] leading-tight">
+            <span className="text-xs font-semibold text-[#11243A] leading-tight truncate max-w-[120px]">
               {currentUser.name}
             </span>
             <div className="flex items-center gap-1">
@@ -108,7 +95,7 @@ export const Header: React.FC<HeaderProps> = ({
                   ? 'تبديل الدور (محاكاة تطوير) إلى: مسؤول المبيعات'
                   : 'تبديل الدور (محاكاة تطوير) إلى: مدير النظام'
               }
-              className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-slate-100 hover:bg-[#11243A] hover:text-white text-slate-700 border border-slate-200 transition-colors cursor-pointer font-medium"
+              className="flex items-center gap-1 text-[11px] px-1.5 sm:px-2 py-1 rounded bg-slate-100 hover:bg-[#11243A] hover:text-white text-slate-700 border border-slate-200 transition-colors cursor-pointer font-medium min-h-[30px]"
             >
               <ArrowLeftRight className="w-3 h-3 text-[#11243A] hover:text-white" />
               <span className="hidden md:inline">
@@ -125,7 +112,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={handleLogout}
               disabled={isLoggingOut}
               title="تسجيل الخروج وإنهاء الجلسة"
-              className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer font-medium disabled:opacity-50"
+              className="flex items-center justify-center gap-1 text-[11px] p-1.5 sm:px-2 sm:py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer font-medium disabled:opacity-50 min-h-[30px] min-w-[30px]"
             >
               {isLoggingOut ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-600" />

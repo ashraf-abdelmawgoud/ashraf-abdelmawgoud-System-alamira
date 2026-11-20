@@ -111,24 +111,71 @@ serve(async (req: Request) => {
     }
 
     // 4. Verify Caller has active ADMIN role in public.authorized_users
+    // Strictly initialize administrative client with SUPABASE_SERVICE_ROLE_KEY
+    // Explicitly set service_role Authorization header to guarantee bypass of RLS and avoid 42501 insufficient_privilege
     const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
+      global: {
+        headers: {
+          Authorization: `Bearer ${supabaseServiceRoleKey}`,
+        },
+      },
     })
 
-    const { data: callerProfile, error: profileError } = await adminClient
+    // Query caller's profile in public.authorized_users using maybeSingle() to avoid PGRST116 error when 0 rows match
+    let { data: callerProfile, error: profileError } = await adminClient
       .from('authorized_users')
       .select('role, is_active')
       .eq('user_id', callerUser.id)
-      .single()
+      .maybeSingle()
 
-    if (
-      profileError ||
-      !callerProfile ||
-      callerProfile.role !== 'ADMIN' ||
-      callerProfile.is_active !== true
-    ) {
+    // Safe fallback: if adminClient encountered a database query error, attempt lookup with caller's verified client
+    if (profileError) {
+      console.warn(
+        `[AUTHZ_DIAG] stage=admin_client_lookup safe_error_code=${profileError.code || 'UNKNOWN'}`
+      )
+      const fallback = await callerClient
+        .from('authorized_users')
+        .select('role, is_active')
+        .eq('user_id', callerUser.id)
+        .maybeSingle()
+
+      if (!fallback.error && fallback.data) {
+        callerProfile = fallback.data
+        profileError = null
+        console.info('[AUTHZ_DIAG] stage=caller_client_fallback profile_found=true')
+      }
+    }
+
+    // Distinguish database query errors from valid authorization denials
+    if (profileError) {
+      console.error(
+        `[AUTHZ_DIAG] stage=caller_profile_lookup safe_error_code=${profileError.code || 'UNKNOWN'} profile_found=false admin_passed=false`
+      )
       return new Response(
-        JSON.stringify({ error: 'غير مصرح: إنشاء حسابات مسؤولي المبيعات مقتصر حصراً على مدير النظام النشط (ADMIN)' }),
+        JSON.stringify({
+          error: 'فشل التحقق من صلاحيات المستخدم في قاعدة البيانات (Database Authorization Query Failed)',
+          code: 'AUTHZ_DB_ERROR',
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const profileFound = Boolean(callerProfile)
+    const normalizedRole = (callerProfile?.role || '').trim().toUpperCase()
+    const isActive = callerProfile?.is_active === true
+    const adminPassed = profileFound && normalizedRole === 'ADMIN' && isActive
+
+    console.info(
+      `[AUTHZ_DIAG] stage=admin_verification profile_found=${profileFound} admin_passed=${adminPassed}`
+    )
+
+    if (!adminPassed) {
+      return new Response(
+        JSON.stringify({
+          error: 'غير مصرح: إنشاء حسابات مسؤولي المبيعات مقتصر حصراً على مدير النظام النشط (ADMIN)',
+          code: 'FORBIDDEN_NOT_ADMIN',
+        }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -256,21 +303,29 @@ serve(async (req: Request) => {
     const newUserId = createdAuth.user.id
 
     // 9. Create Record in public.authorized_users linking to auth.users(id)
+    // NOTE: The unsupported "phone" column is permanently omitted from authorized_users insertion.
+    // The phone number is preserved in auth.users user_metadata.
+    const insertPayload: Record<string, unknown> = {
+      user_id: newUserId,
+      email: cleanEmail,
+      full_name: cleanName,
+      username: finalUsername,
+      role: 'SALES_OPERATOR',
+      is_active: true,
+    }
+
     const { data: authRecord, error: insertError } = await adminClient
       .from('authorized_users')
-      .insert({
-        user_id: newUserId,
-        email: cleanEmail,
-        full_name: cleanName,
-        username: finalUsername,
-        phone: cleanPhone,
-        role: 'SALES_OPERATOR',
-        is_active: true,
-      })
+      .insert(insertPayload)
       .select('*')
       .single()
 
     if (insertError) {
+      // Enhanced SERVER-SIDE structured diagnostic logging
+      // Captures error_code, error_message, error_details, and error_hint without exposing sensitive data
+      console.error(
+        `[PROVISION_INSERT_DIAG] stage=authorized_users_insert error_code=${insertError.code || 'UNKNOWN'} error_message=${insertError.message || 'UNKNOWN'} error_details=${insertError.details || 'NONE'} error_hint=${insertError.hint || 'NONE'}`
+      )
       console.error('[PROVISION_INSERT_ERROR] Failed to insert into authorized_users table.')
 
       // Verified rollback cleanup: attempt to delete orphan auth user

@@ -237,7 +237,7 @@ export const ProductsView: React.FC = () => {
         onClose={() => setDeletingProduct(null)}
         onConfirm={handleDeleteProduct}
         title="تأكيد حذف الصنف"
-        message={`هل أنت متأكد من رغبتك في حذف الصنف (${deletingProduct?.name})؟ لن يؤثر هذا الإجراء على قاعدة بيانات الإنتاج.`}
+        message={`هل أنت متأكد من رغبتك في حذف الصنف (${deletingProduct?.name})؟ لا يمكن التراجع عن هذا الإجراء بعد تنفيذه.`}
         confirmText="حذف من الذاكرة"
         isLoading={isDeleting}
       />

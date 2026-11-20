@@ -13,6 +13,7 @@ import {
   SupplierStatus,
   SalesInvoice,
   SalesInvoiceFormData,
+  StockReceipt,
   InventoryMovementLog,
   AuditLogEntry,
   User,
@@ -1321,6 +1322,70 @@ export const supabaseDataService = {
       outcome: 'success',
       timestamp: new Date().toISOString(),
     })
+  },
+
+  // =========================================================================
+  // STOCK RECEIPTS (أذون الاستلام)
+  // =========================================================================
+  async getReceipts(): Promise<StockReceipt[]> {
+    try {
+      const supabase = getSupabaseClient()
+      const { data, error } = await supabase
+        .from('stock_receipts')
+        .select(`
+          *,
+          suppliers(name),
+          stock_receipt_items(
+            id,
+            receipt_id,
+            product_id,
+            quantity,
+            unit_price,
+            line_total,
+            products(sku, name, unit, allows_decimal_quantity)
+          )
+        `)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        // Return empty array gracefully if table is empty or unpopulated
+        console.warn('Could not query stock_receipts:', error.message)
+        return []
+      }
+
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        receipt_number: row.receipt_number,
+        receipt_date: row.receipt_date,
+        supplier_id: row.supplier_id,
+        supplier_name: row.suppliers?.name || 'مورد عام',
+        supplier_invoice_number: row.supplier_invoice_number || '',
+        notes: row.notes || '',
+        total_amount: Number(row.total_amount || 0),
+        status: row.status,
+        approved_by: row.approved_by,
+        approved_at: row.approved_at,
+        cancelled_by: row.cancelled_by,
+        cancelled_at: row.cancelled_at,
+        cancel_reason: row.cancel_reason,
+        created_by: row.created_by,
+        created_at: row.created_at,
+        items: (row.stock_receipt_items || []).map((item: any) => ({
+          id: item.id,
+          receipt_id: item.receipt_id,
+          product_id: item.product_id,
+          product_sku: item.products?.sku,
+          product_name: item.products?.name,
+          unit: item.products?.unit,
+          allows_decimal_quantity: item.products?.allows_decimal_quantity,
+          quantity: Number(item.quantity || 0),
+          unit_price: Number(item.unit_price || 0),
+          line_total: Number(item.line_total || 0),
+        })),
+      }))
+    } catch {
+      return []
+    }
   },
 
   // =========================================================================

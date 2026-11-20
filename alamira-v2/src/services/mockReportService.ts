@@ -3,7 +3,8 @@
  * Coordinates asynchronous mock data retrieval and runs domain calculations.
  */
 
-import { mockDataService } from './mockDataService';
+import { dataService } from './dataService';
+import { supabaseDataService } from './supabaseDataService';
 import {
   ReportType,
   calculateCurrentInventoryReport,
@@ -185,14 +186,18 @@ export const mockReportService = {
     const { reportType, dateFrom, dateTo } = options;
     const meta = REPORT_METADATA[reportType] || REPORT_METADATA.current_inventory;
 
+    const receiptsPromise = dataService.isMock()
+      ? dataService.getReceipts()
+      : supabaseDataService.getReceipts();
+
     const [products, customers, suppliers, invoices, receipts, movements] =
       await Promise.all([
-        mockDataService.getProducts(),
-        mockDataService.getCustomers(),
-        mockDataService.getSuppliers(),
-        mockDataService.getInvoices(),
-        mockDataService.getReceipts(),
-        mockDataService.getInventoryMovements(),
+        dataService.getProducts(),
+        dataService.getCustomers(),
+        dataService.getSuppliers(),
+        dataService.getInvoices(),
+        receiptsPromise,
+        dataService.getInventoryMovements(),
       ]);
 
     switch (reportType) {
@@ -342,3 +347,6 @@ export const mockReportService = {
     }
   },
 };
+
+export const reportService = mockReportService;
+

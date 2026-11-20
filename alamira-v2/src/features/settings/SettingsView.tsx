@@ -28,7 +28,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   return (
     <div className="space-y-4">
       {/* Settings Navigation Tabs */}
-      <div className="flex flex-wrap gap-2 pb-2 border-b border-[#D9E2EC]">
+      <div className="flex items-center gap-2 pb-2 border-b border-[#D9E2EC] overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap">
         {tabs.map((tab) => {
           const isSelected = activeTab === tab.id;
           return (
@@ -36,7 +36,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-2 sm:px-4 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                 isSelected
                   ? 'bg-[#11243A] text-white shadow-xs border border-[#11243A]'
                   : 'bg-[#F8FAFC] text-slate-700 hover:bg-slate-100 border border-[#D9E2EC]'

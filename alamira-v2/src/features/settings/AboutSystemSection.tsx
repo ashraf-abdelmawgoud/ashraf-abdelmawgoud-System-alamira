@@ -29,14 +29,14 @@ export const AboutSystemSection: React.FC = () => {
         </div>
 
         <div className="p-4 bg-white rounded-xl border border-[#D9E2EC] space-y-2">
-          <span className="text-[11px] font-bold text-[#64748B] block">حالة العزل وسلامة الإنتاج</span>
+          <span className="text-[11px] font-bold text-[#64748B] block">حماية البيانات وسلامة النظام</span>
           <div className="flex items-center gap-1.5 text-[#0F766E] font-bold">
             <ShieldCheck className="w-4 h-4 text-[#0F766E]" />
-            <span>بيئة تطوير معزولة محلياً (Zero-Risk Architecture)</span>
+            <span>منظومة سحابية مشفرة ومؤمنة (Enterprise Security)</span>
           </div>
           <p className="text-slate-600 leading-relaxed">
-            المنظومة الحية V1 وقاعدة بيانات Supabase محمية بنسبة 100% ولا يتم الاتصال بها أو تعديل
-            جداولها خلال هذه المرحلة.
+            تخضع جميع العمليات لقواعد حماية صارمة على مستوى السجلات (RLS) ومسارات تدقيق غير قابلة للتعديل
+            مع تشفير كامل لبيانات النظام.
           </p>
         </div>
       </div>

@@ -423,12 +423,12 @@ describe('Phase 4 — Reports & Analytics Domain & Excel Engine', () => {
     it('renders ReportsView UI, allows switching categories, and resets filters', async () => {
       render(<ReportsView />);
 
-      // Verify header controls exist
+      // Verify header and navigation tabs exist
       await waitFor(() => {
-        expect(screen.getByText('نوع التقرير المطلوب')).toBeInTheDocument();
+        expect(screen.getByText('التقارير العامة والمؤشرات')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('المخزون والأرصدة')).toBeInTheDocument();
+      expect(screen.getByText('نظرة عامة')).toBeInTheDocument();
       expect(screen.getByText('تقارير المبيعات')).toBeInTheDocument();
 
       // Click on Sales category pill
@@ -441,6 +441,62 @@ describe('Phase 4 — Reports & Analytics Domain & Excel Engine', () => {
       // Click on reset button
       const resetBtn = screen.getByTitle('إعادة تعيين المرشحات');
       fireEvent.click(resetBtn);
+    });
+
+    it('renders ReportsView in real data mode without post-cutover placeholders or banners', async () => {
+      render(<ReportsView />);
+
+      await waitFor(() => {
+        expect(screen.getByText('التقارير العامة والمؤشرات')).toBeInTheDocument();
+      });
+
+      // Verify no technical post-cutover placeholders or banners are displayed
+      expect(screen.queryByText(/Post-Cutover/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/قيد الربط المباشر/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Live Backend/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/متصل بـ Supabase/i)).not.toBeInTheDocument();
+    });
+
+    it('reportingService enforces approved-only invoices and Cairo timezone date filters', async () => {
+      const { reportingService, resolveDateFilter } = await import('../services/reportingService');
+      const resolved = resolveDateFilter('today');
+      expect(resolved.label).toBe('اليوم');
+      expect(resolved.from).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+      const overview = await reportingService.getOverviewReport({ userRole: 'ADMIN' });
+      expect(overview.category).toBe('overview');
+      expect(overview.metrics.length).toBeGreaterThan(0);
+      expect(overview.columns.length).toBeGreaterThan(0);
+    });
+
+    it('reportingService financial report strictly marks profit and COGS as unavailable without calculating false profits', async () => {
+      const { reportingService } = await import('../services/reportingService');
+      const financial = await reportingService.getFinancialReport({ userRole: 'ADMIN' });
+      expect(financial.category).toBe('financial');
+
+      const cogsMetric = financial.metrics.find((m) => m.id === 'cogs');
+      const profitMetric = financial.metrics.find((m) => m.id === 'gross_profit');
+      const marginMetric = financial.metrics.find((m) => m.id === 'profit_margin');
+
+      expect(cogsMetric?.value).toBe('البيانات غير متاحة');
+      expect(profitMetric?.value).toBe('البيانات غير متاحة');
+      expect(marginMetric?.value).toBe('البيانات غير متاحة');
+      expect(financial.notice).toContain('لا يتم احتساب تكلفة البضاعة المباعة أو الأرباح التقديرية');
+    });
+
+    it('reportingService enforces RBAC and rejects non-admin access to financial and inventory reports', async () => {
+      const { reportingService } = await import('../services/reportingService');
+
+      await expect(
+        reportingService.getFinancialReport({ userRole: 'SALES_OPERATOR' })
+      ).rejects.toThrow(/ADMIN ONLY/i);
+
+      await expect(
+        reportingService.getInventoryReport({
+          userRole: 'SALES_OPERATOR',
+          subType: 'current_stock',
+        })
+      ).rejects.toThrow(/ADMIN ONLY/i);
     });
   });
 });

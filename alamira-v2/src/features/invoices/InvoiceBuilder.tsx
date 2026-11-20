@@ -248,34 +248,36 @@ export const InvoiceBuilder: React.FC<InvoiceBuilderProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={loading}
-            className="text-xs"
-          >
-            إلغاء
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => handleSubmit('draft')}
-            disabled={loading}
-            className="bg-amber-100 text-amber-900 hover:bg-amber-200 border-0 text-xs"
-          >
-            {loading ? 'جاري الحفظ...' : 'حفظ كمسودة'}
-          </Button>
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <Button
             type="button"
             variant="primary"
             onClick={() => handleSubmit('approve')}
             disabled={loading}
-            className="bg-[#0F766E] hover:bg-[#115E59] text-xs"
+            className="w-full sm:w-auto bg-[#0F766E] hover:bg-[#115E59] text-xs order-1 sm:order-3"
           >
             {loading ? 'جاري الاعتماد...' : 'اعتماد الفاتورة وخصم المخزون'}
           </Button>
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 order-2 sm:order-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
+              className="w-full sm:w-auto text-xs"
+            >
+              إلغاء
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => handleSubmit('draft')}
+              disabled={loading}
+              className="w-full sm:w-auto bg-amber-100 text-amber-900 hover:bg-amber-200 border-0 text-xs"
+            >
+              {loading ? 'جاري الحفظ...' : 'حفظ كمسودة'}
+            </Button>
+          </div>
         </div>
       </div>
 

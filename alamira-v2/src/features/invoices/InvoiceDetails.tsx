@@ -35,9 +35,9 @@ export const InvoiceDetails: React.FC<InvoiceDetailsProps> = ({
   const items = invoice.items || []
 
   const modalFooter = (
-    <div className="flex flex-wrap items-center justify-between gap-2.5 w-full">
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={onClose}>
+    <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 w-full">
+      <div className="flex items-center gap-2 w-full sm:w-auto">
+        <Button variant="outline" size="sm" onClick={onClose} className="flex-1 sm:flex-none">
           إغلاق
         </Button>
         {onPrint && (
@@ -45,7 +45,7 @@ export const InvoiceDetails: React.FC<InvoiceDetailsProps> = ({
             variant="outline"
             size="sm"
             onClick={() => onPrint(invoice)}
-            className="text-[#0a192f] border-slate-300 hover:bg-slate-50 inline-flex items-center gap-1.5"
+            className="text-[#0a192f] border-slate-300 hover:bg-slate-50 inline-flex items-center justify-center gap-1.5 flex-1 sm:flex-none"
           >
             <Printer className="w-3.5 h-3.5 text-[#11243A]" />
             <span>طباعة / تصدير</span>
@@ -53,7 +53,7 @@ export const InvoiceDetails: React.FC<InvoiceDetailsProps> = ({
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
         {invoice.status === 'draft' && (
           <>
             {onDelete && (
@@ -170,7 +170,7 @@ export const InvoiceDetails: React.FC<InvoiceDetailsProps> = ({
         <div className="border border-[#E2E8F0] rounded-xl overflow-hidden bg-white shadow-2xs">
           <div className="overflow-x-auto">
             <table className="w-full text-right text-xs">
-              <thead className="bg-slate-50 text-[#11243A] font-bold border-b border-[#E2E8F0]">
+              <thead className="bg-slate-50 text-[#11243A] font-bold border-b border-[#E2E8F0] hidden sm:table-header-group">
                 <tr>
                   <th className="py-2.5 px-3 w-10 text-center font-mono">#</th>
                   <th className="py-2.5 px-3 min-w-[200px]">الصنف</th>
@@ -181,7 +181,7 @@ export const InvoiceDetails: React.FC<InvoiceDetailsProps> = ({
                   <th className="py-2.5 px-3 text-center w-32">الصافي</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F1F5F9] bg-white">
+              <tbody className="divide-y divide-[#F1F5F9] bg-white sm:divide-y">
                 {items.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="text-center py-8 text-[#94A3B8]">
@@ -190,11 +190,23 @@ export const InvoiceDetails: React.FC<InvoiceDetailsProps> = ({
                   </tr>
                 ) : (
                   items.map((it, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-2.5 px-3 text-center text-[#64748B] font-mono">{idx + 1}</td>
-                      <td className="py-2.5 px-3 text-[#11243A]">
+                    <tr
+                      key={idx}
+                      className="block sm:table-row p-3 mb-2 rounded-xl border border-[#E2E8F0] sm:border-0 bg-slate-50/40 sm:bg-white hover:bg-slate-50/70 transition-colors"
+                    >
+                      <td className="hidden sm:table-cell py-2.5 px-3 text-center text-[#64748B] font-mono">
+                        {idx + 1}
+                      </td>
+                      <td className="block sm:table-cell py-1 sm:py-2.5 px-0 sm:px-3 text-[#11243A]">
                         <div>
-                          <span className="font-semibold block leading-snug">{it.product_name_snapshot}</span>
+                          <div className="flex items-center justify-between sm:block">
+                            <span className="font-bold sm:font-semibold block leading-snug">
+                              {it.product_name_snapshot}
+                            </span>
+                            <span className="sm:hidden text-xs font-bold text-[#0F766E] tabular-nums">
+                              {formatCurrency(it.net_amount)}
+                            </span>
+                          </div>
                           {it.product_sku_snapshot && (
                             <span className="inline-block mt-0.5 text-[10px] font-mono text-[#64748B] bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/60">
                               {it.product_sku_snapshot}
@@ -202,25 +214,33 @@ export const InvoiceDetails: React.FC<InvoiceDetailsProps> = ({
                           )}
                         </div>
                       </td>
-                      <td className="py-2.5 px-2.5 text-center text-[#64748B] whitespace-nowrap">
+                      <td className="hidden sm:table-cell py-2.5 px-2.5 text-center text-[#64748B] whitespace-nowrap">
                         {it.unit_snapshot || 'وحدة'}
                       </td>
-                      <td className="py-2.5 px-2.5 text-center font-bold text-[#11243A] tabular-nums whitespace-nowrap">
-                        {formatNumber(it.quantity)}
+                      <td className="block sm:table-cell py-1 sm:py-2.5 px-0 sm:px-2.5 text-[#11243A]">
+                        <div className="flex items-center justify-between sm:justify-center text-xs">
+                          <span className="sm:hidden text-[#64748B]">الكمية وسعر الوحدة:</span>
+                          <span className="tabular-nums font-semibold">
+                            {formatNumber(it.quantity)} {it.unit_snapshot || 'وحدة'} × {formatCurrency(it.unit_price)}
+                          </span>
+                        </div>
                       </td>
-                      <td className="py-2.5 px-3 text-center text-[#334155] tabular-nums whitespace-nowrap">
+                      <td className="hidden sm:table-cell py-2.5 px-3 text-center text-[#334155] tabular-nums whitespace-nowrap">
                         {formatCurrency(it.unit_price)}
                       </td>
-                      <td className="py-2.5 px-3 text-center tabular-nums whitespace-nowrap">
+                      <td className="block sm:table-cell py-0.5 sm:py-2.5 px-0 sm:px-3 text-center">
                         {Number(it.discount_amount) > 0 ? (
-                          <span className="text-[#DC2626] font-bold bg-rose-50 px-1.5 py-0.5 rounded text-[11px]">
-                            -{formatCurrency(it.discount_amount)}
-                          </span>
+                          <div className="flex items-center justify-between sm:justify-center text-xs">
+                            <span className="sm:hidden text-[#64748B]">خصم البند:</span>
+                            <span className="text-[#DC2626] font-bold bg-rose-50 px-1.5 py-0.5 rounded text-[11px] tabular-nums">
+                              -{formatCurrency(it.discount_amount)}
+                            </span>
+                          </div>
                         ) : (
-                          <span className="text-[#94A3B8]">0.00</span>
+                          <span className="hidden sm:inline text-[#94A3B8] tabular-nums">0.00</span>
                         )}
                       </td>
-                      <td className="py-2.5 px-3 text-center font-bold text-[#0F766E] tabular-nums whitespace-nowrap">
+                      <td className="hidden sm:table-cell py-2.5 px-3 text-center font-bold text-[#0F766E] tabular-nums whitespace-nowrap">
                         {formatCurrency(it.net_amount)}
                       </td>
                     </tr>

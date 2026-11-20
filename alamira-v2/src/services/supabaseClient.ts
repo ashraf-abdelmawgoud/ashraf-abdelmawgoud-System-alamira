@@ -53,15 +53,28 @@ export function isSupabaseConfigured(): boolean {
  * Default is mock mode unless VITE_ENABLE_MOCK_DATA (or VITE_USE_MOCK) is explicitly set to 'false' AND Supabase is configured.
  */
 export function isMockMode(): boolean {
+  // Production safety: In production mode, STRICTLY FORBID mock data and demonstration products,
+  // even if VITE_ENABLE_MOCK_DATA is explicitly set to 'true'. Real Supabase backend is mandatory in production.
+  const isProd = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.PROD)
+  if (isProd) {
+    return false
+  }
+
+  // Preserve mock support ONLY for local development and automated test environments:
   const envFlag =
     typeof import.meta !== 'undefined'
       ? (import.meta.env?.VITE_ENABLE_MOCK_DATA ?? import.meta.env?.VITE_USE_MOCK)
       : undefined
+
   if (envFlag === 'false') {
     return !isSupabaseConfigured()
   }
-  // If explicitly true or unset in dev/test, use mock
-  return true
+  if (envFlag === 'true') {
+    return true
+  }
+
+  // If unset in dev/test, use mock unless Supabase is explicitly configured
+  return !isSupabaseConfigured()
 }
 
 let supabaseInstance: SupabaseClient | null = null

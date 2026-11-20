@@ -360,7 +360,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
         {/* Users Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-right text-xs">
-            <thead className="bg-[#F8FAFC] text-slate-600 border-b border-slate-200/80 font-bold">
+            <thead className="bg-[#F8FAFC] text-slate-600 border-b border-slate-200/80 font-bold hidden md:table-header-group">
               <tr>
                 <th className="py-3 px-4">المستخدم</th>
                 <th className="py-3 px-4">المسمى الوظيفي</th>
@@ -369,7 +369,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                 <th className="py-3 px-4 text-center">الإجراءات</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 md:divide-y">
               {loading ? (
                 <tr>
                   <td colSpan={5} className="py-8 text-center text-slate-400">
@@ -392,12 +392,12 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                     <tr
                       key={user.id}
                       className={cn(
-                        'hover:bg-slate-50/70 transition-colors',
+                        'block md:table-row p-3.5 mb-2.5 rounded-xl border border-slate-200 md:border-0 bg-white md:bg-transparent shadow-2xs md:shadow-none hover:bg-slate-50/70 transition-colors',
                         isCurrent && 'bg-slate-50/90 font-medium'
                       )}
                     >
                       {/* Name & Username */}
-                      <td className="py-3 px-4">
+                      <td className="block md:table-cell py-1.5 md:py-3 px-0 md:px-4">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-xl bg-slate-100 text-[#11243A] font-bold flex items-center justify-center shrink-0 border border-slate-200">
                             {user.name.charAt(0)}
@@ -437,12 +437,14 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       </td>
 
                       {/* Title */}
-                      <td className="py-3 px-4 text-slate-700">
+                      <td className="block md:table-cell py-1 md:py-3 px-0 md:px-4 text-slate-700">
+                        <span className="md:hidden text-[11px] text-slate-400 font-semibold ml-2">المسمى:</span>
                         {user.title || (user.role === 'ADMIN' ? 'مدير عام' : 'مسؤول مبيعات')}
                       </td>
 
                       {/* Role Badge */}
-                      <td className="py-3 px-4">
+                      <td className="block md:table-cell py-1 md:py-3 px-0 md:px-4">
+                        <span className="md:hidden text-[11px] text-slate-400 font-semibold ml-2">الدور:</span>
                         {isPrimary ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-950 border border-amber-300">
                             <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
@@ -462,7 +464,8 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       </td>
 
                       {/* Status Badge */}
-                      <td className="py-3 px-4">
+                      <td className="block md:table-cell py-1 md:py-3 px-0 md:px-4">
+                        <span className="md:hidden text-[11px] text-slate-400 font-semibold ml-2">الحالة:</span>
                         {isActive ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
                             <CheckCircle2 className="w-3 h-3" />
@@ -477,8 +480,8 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                      <td className="block md:table-cell pt-2.5 md:py-3 px-0 md:px-4 border-t border-slate-100 md:border-t-0 mt-2 md:mt-0">
+                        <div className="flex items-center justify-end md:justify-center gap-1.5 flex-wrap">
                           {/* Switch Account Button (Only in Mock mode for testing) */}
                           {isMock && (
                             <button

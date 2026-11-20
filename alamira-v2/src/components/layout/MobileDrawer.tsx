@@ -36,7 +36,7 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose }) =
       />
 
       {/* Drawer content sliding from the right */}
-      <div className="fixed inset-y-0 right-0 max-w-xs w-full bg-[#11243A] shadow-2xl flex flex-col z-50 transform transition-transform duration-300 ease-in-out">
+      <div className="fixed inset-y-0 right-0 w-64 max-w-[85vw] bg-[#11243A] shadow-2xl flex flex-col z-50 transform transition-transform duration-300 ease-in-out">
         <div className="absolute top-3 left-3 z-20">
           <button
             type="button"

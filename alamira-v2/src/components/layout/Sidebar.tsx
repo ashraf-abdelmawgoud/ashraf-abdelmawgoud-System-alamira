@@ -1,5 +1,6 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
+import { LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getNavigationItemsForUser } from './navigation'
 import { useAuth } from '@/auth'
@@ -11,7 +12,7 @@ export interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigate }) => {
-  const { currentUser } = useAuth()
+  const { currentUser, logout } = useAuth()
   const visibleItems = getNavigationItemsForUser(currentUser)
   return (
     <aside
@@ -48,7 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigate }) => {
               <div
                 key={item.name}
                 title={item.disabledReason}
-                className="flex items-center justify-between h-9 px-3 rounded-md text-[13.5px] font-semibold text-slate-500 cursor-not-allowed bg-slate-900/30"
+                className="flex items-center justify-between h-10 sm:h-9 px-3 rounded-md text-[13.5px] font-semibold text-slate-500 cursor-not-allowed bg-slate-900/30"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Icon className="w-4 h-4 text-slate-600 shrink-0" />
@@ -69,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigate }) => {
               onClick={onNavigate}
               className={({ isActive }) =>
                 cn(
-                  'group flex items-center justify-between h-9 px-3 rounded-md text-[13.5px] font-semibold transition-all duration-150',
+                  'group flex items-center justify-between h-10 sm:h-9 px-3 rounded-md text-[13.5px] font-semibold transition-all duration-150',
                   isActive
                     ? 'bg-[#1E3A5F] text-white font-extrabold border-r-[3.5px] border-[#D7A44A] shadow-xs'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -98,6 +99,37 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigate }) => {
           )
         })}
       </nav>
+
+      {/* Mobile Drawer Footer: User profile & Logout */}
+      {currentUser && (
+        <div className="p-3 border-t border-slate-800 bg-[#0A1624] shrink-0 lg:hidden">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-[#1E3A5F] border border-slate-700 flex items-center justify-center shrink-0 text-white font-bold text-xs">
+                {currentUser.name.charAt(0)}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-slate-200 truncate">{currentUser.name}</div>
+                <div className="text-[10px] text-slate-400 truncate">
+                  {currentUser.role === 'ADMIN' ? 'مدير النظام' : 'مسؤول مبيعات'}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onNavigate?.()
+                logout()
+              }}
+              className="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-500/20 transition-colors cursor-pointer shrink-0"
+              title="تسجيل الخروج"
+              aria-label="تسجيل الخروج"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </aside>
   )
 }
