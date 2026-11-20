@@ -4,7 +4,7 @@
   "outputDirectory": "alamira-v2/dist",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!assets/|favicon|.*\\..*).*)",
       "destination": "/index.html"
     }
   ],
@@ -12,6 +12,10 @@
     {
       "source": "/(.*)",
       "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
         {
           "key": "X-Content-Type-Options",
           "value": "nosniff"

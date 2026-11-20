@@ -42,3 +42,10 @@ try {
 } catch {
   // ignore if already defined
 }
+
+if (typeof window !== 'undefined') {
+  window.__ALAMIRA_CONFIG__ = {
+    SUPABASE_URL: window.__ALAMIRA_CONFIG__?.SUPABASE_URL || 'https://mock.supabase.co',
+    SUPABASE_ANON_KEY: window.__ALAMIRA_CONFIG__?.SUPABASE_ANON_KEY || 'mock-anon-key',
+  };
+}

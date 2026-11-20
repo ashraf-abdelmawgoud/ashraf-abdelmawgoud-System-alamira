@@ -155,8 +155,8 @@
 }
 
 .action-btn-pill:focus-visible {
-  ring: 2px solid #11243A;
-  ring-offset: 1px;
+  outline: 2px solid #11243A;
+  outline-offset: 1px;
 }
 
 .action-btn-pill-muted {
