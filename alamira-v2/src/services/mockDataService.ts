@@ -2116,10 +2116,19 @@ export const mockDataService = {
       throw new Error('كلمة المرور مطلوبة ويجب أن تتكون من 8 أحرف على الأقل')
     }
 
+    let finalUsername = data.username?.trim().toLowerCase()
+    if (!finalUsername) {
+      let base = cleanEmail.split('@')[0].replace(/[^a-z0-9_]/gi, '_').toLowerCase() || 'sales'
+      if (usersStore.some((u) => u.username.toLowerCase() === base)) {
+        base = `${base}_${Math.floor(1000 + Math.random() * 9000)}`
+      }
+      finalUsername = base
+    }
+
     return this.createUser(
       {
         name: cleanName,
-        username: data.username?.trim().toLowerCase() || cleanEmail.split('@')[0],
+        username: finalUsername,
         email: cleanEmail,
         role: 'SALES_OPERATOR',
         title: 'مسؤول مبيعات',

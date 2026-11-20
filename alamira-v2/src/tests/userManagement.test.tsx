@@ -123,7 +123,7 @@ describe('Al-Amira ERP V2 — Phase 1 RBAC & User Management', () => {
       expect(screen.queryByText('سمير خليل')).not.toBeInTheDocument()
     })
 
-    it('adds a new mock user and prevents duplicate usernames', async () => {
+    it('adds a new mock user with 3-field form and prevents duplicate email registration', async () => {
       const user = userEvent.setup()
       render(
         <AuthProvider initialUser={adminUser}>
@@ -139,24 +139,30 @@ describe('Al-Amira ERP V2 — Phase 1 RBAC & User Management', () => {
       await user.click(screen.getByRole('button', { name: /إضافة مسؤول مبيعات/i }))
       expect(screen.getByText('إضافة مسؤول مبيعات جديد')).toBeInTheDocument()
 
-      // Fill Form with duplicate username 'admin'
-      await user.type(screen.getByLabelText(/اسم المستخدم بالكامل/i), 'طارق العبد')
-      await user.type(screen.getByLabelText(/اسم الدخول \(Username\)/i), 'admin')
-      await user.type(screen.getByLabelText(/البريد الإلكتروني/i), 'tarek@alamira.com')
-      await user.type(screen.getByLabelText(/كلمة المرور الأولية/i), 'Password123!')
-      await user.type(screen.getByLabelText(/تأكيد كلمة المرور/i), 'Password123!')
-      await user.click(screen.getByRole('button', { name: 'إنشاء الحساب' }))
+      // Verify ONLY the 3 visible fields are present in the form
+      expect(screen.getByLabelText(/^اسم المستخدم/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/^البريد الإلكتروني/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/^كلمة المرور/i)).toBeInTheDocument()
+      expect(screen.queryByLabelText(/اسم الدخول/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/رقم الهاتف/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/تأكيد كلمة المرور/i)).not.toBeInTheDocument()
+
+      // Fill Form with duplicate email
+      await user.type(screen.getByLabelText(/^اسم المستخدم/i), 'طارق العبد')
+      await user.type(screen.getByLabelText(/^البريد الإلكتروني/i), 'sales@alamira.com')
+      await user.type(screen.getByLabelText(/^كلمة المرور/i), 'Password123!')
+      await user.click(screen.getByRole('button', { name: /إنشاء حساب مسؤول المبيعات/i }))
 
       // Should show duplicate error
       await waitFor(() => {
         expect(screen.getByText(/مسجل بالفعل لمستخدم آخر/i)).toBeInTheDocument()
       })
 
-      // Change username to unique
-      const usernameInput = screen.getByLabelText(/اسم الدخول \(Username\)/i)
-      await user.clear(usernameInput)
-      await user.type(usernameInput, 'tarek_sales')
-      await user.click(screen.getByRole('button', { name: 'إنشاء الحساب' }))
+      // Change email to unique
+      const emailInput = screen.getByLabelText(/^البريد الإلكتروني/i)
+      await user.clear(emailInput)
+      await user.type(emailInput, 'tarek@alamira.com')
+      await user.click(screen.getByRole('button', { name: /إنشاء حساب مسؤول المبيعات/i }))
 
       // User is created and rendered
       await waitFor(() => {
@@ -169,7 +175,7 @@ describe('Al-Amira ERP V2 — Phase 1 RBAC & User Management', () => {
       expect(logs[0].entity_name_or_number).toBe('طارق العبد')
     })
 
-    it('validates matching passwords and strong password policy when adding user', async () => {
+    it('validates strong password policy when adding user with 3-field form', async () => {
       const user = userEvent.setup()
       render(
         <AuthProvider initialUser={adminUser}>
@@ -184,26 +190,21 @@ describe('Al-Amira ERP V2 — Phase 1 RBAC & User Management', () => {
       // Open Add Modal
       await user.click(screen.getByRole('button', { name: /إضافة مسؤول مبيعات/i }))
 
-      await user.type(screen.getByLabelText(/اسم المستخدم بالكامل/i), 'سامي فؤاد')
-      await user.type(screen.getByLabelText(/اسم الدخول \(Username\)/i), 'sami_sales')
-      await user.type(screen.getByLabelText(/البريد الإلكتروني/i), 'sami@alamira.com')
-      await user.type(screen.getByLabelText(/كلمة المرور الأولية/i), 'Password123!')
-      await user.type(screen.getByLabelText(/تأكيد كلمة المرور/i), 'DifferentPassword456!')
-      await user.click(screen.getByRole('button', { name: 'إنشاء الحساب' }))
+      await user.type(screen.getByLabelText(/^اسم المستخدم/i), 'سامي فؤاد')
+      await user.type(screen.getByLabelText(/^البريد الإلكتروني/i), 'sami@alamira.com')
+      await user.type(screen.getByLabelText(/^كلمة المرور/i), 'short')
+      await user.click(screen.getByRole('button', { name: /إنشاء حساب مسؤول المبيعات/i }))
 
-      // Should show mismatched passwords error
+      // Should show minimum length error
       await waitFor(() => {
-        expect(screen.getByText('كلمتا المرور غير متطابقتين، يرجى إعادة التأكيد بدقة')).toBeInTheDocument()
+        expect(screen.getByText('يجب أن تتكون كلمة المرور من 8 أحرف على الأقل')).toBeInTheDocument()
       })
 
-      // Fix confirm password to match weak password
-      const pwdInput = screen.getByLabelText(/كلمة المرور الأولية/i)
-      const confirmInput = screen.getByLabelText(/تأكيد كلمة المرور/i)
+      // Type weak password without numbers/symbols
+      const pwdInput = screen.getByLabelText(/^كلمة المرور/i)
       await user.clear(pwdInput)
-      await user.clear(confirmInput)
       await user.type(pwdInput, 'abcdefgh')
-      await user.type(confirmInput, 'abcdefgh')
-      await user.click(screen.getByRole('button', { name: 'إنشاء الحساب' }))
+      await user.click(screen.getByRole('button', { name: /إنشاء حساب مسؤول المبيعات/i }))
 
       // Should show strong password policy error
       await waitFor(() => {

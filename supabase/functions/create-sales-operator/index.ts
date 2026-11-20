@@ -146,7 +146,6 @@ serve(async (req: Request) => {
 
     const cleanEmail = (body.email || '').trim().toLowerCase()
     const cleanName = (body.full_name || '').trim()
-    const cleanUsername = (body.username || '').trim().toLowerCase() || cleanEmail.split('@')[0]
     const cleanPhone = (body.phone || '').trim() || null
     const cleanPassword = (body.password || '').trim()
 
@@ -180,7 +179,7 @@ serve(async (req: Request) => {
       )
     }
 
-    // 7. Duplicate Checks in authorized_users (Email & Username)
+    // 7. Duplicate Checks in authorized_users (Email) & Unique Username Derivation
     const { data: existingUserByEmail } = await adminClient
       .from('authorized_users')
       .select('user_id')
@@ -194,16 +193,32 @@ serve(async (req: Request) => {
       )
     }
 
-    if (cleanUsername) {
+    // Safely derive a unique internal username without collisions
+    let finalUsername = (body.username || '').trim().toLowerCase()
+    if (!finalUsername) {
+      const baseUsername = cleanEmail.split('@')[0].replace(/[^a-z0-9_]/gi, '_').toLowerCase() || 'sales'
+      
+      const { data: existingUserByBase } = await adminClient
+        .from('authorized_users')
+        .select('user_id')
+        .eq('username', baseUsername)
+        .maybeSingle()
+
+      if (existingUserByBase) {
+        finalUsername = `${baseUsername}_${Math.floor(1000 + Math.random() * 9000)}`
+      } else {
+        finalUsername = baseUsername
+      }
+    } else {
       const { data: existingUserByUsername } = await adminClient
         .from('authorized_users')
         .select('user_id')
-        .eq('username', cleanUsername)
+        .eq('username', finalUsername)
         .maybeSingle()
 
       if (existingUserByUsername) {
         return new Response(
-          JSON.stringify({ error: `اسم المستخدم "${cleanUsername}" مستخدم بالفعل، يرجى اختيار اسم مستخدم آخر` }),
+          JSON.stringify({ error: `اسم المستخدم "${finalUsername}" مستخدم بالفعل، يرجى اختيار اسم مستخدم آخر` }),
           { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
@@ -218,7 +233,7 @@ serve(async (req: Request) => {
       email_confirm: true,
       user_metadata: {
         full_name: cleanName,
-        username: cleanUsername,
+        username: finalUsername,
         phone: cleanPhone,
         role: 'SALES_OPERATOR',
         must_change_password: true,
@@ -247,7 +262,7 @@ serve(async (req: Request) => {
         user_id: newUserId,
         email: cleanEmail,
         full_name: cleanName,
-        username: cleanUsername,
+        username: finalUsername,
         phone: cleanPhone,
         role: 'SALES_OPERATOR',
         is_active: true,
