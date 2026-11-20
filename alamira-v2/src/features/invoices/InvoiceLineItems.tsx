@@ -6,6 +6,7 @@ import { CalculatedLineItem } from '@/domain/invoiceCalculations'
 import { useAuth } from '@/auth'
 
 export interface LineItemFormState {
+  id?: string
   productId: string
   quantity: number
   unitPrice: number
@@ -17,9 +18,9 @@ interface InvoiceLineItemsProps {
   items: LineItemFormState[]
   calculatedItems: CalculatedLineItem[]
   products: Product[]
-  onItemChange: (index: number, updated: Partial<LineItemFormState>) => void
+  onItemChange: (identifier: string | number, updated: Partial<LineItemFormState>) => void
   onAddItem: () => void
-  onRemoveItem: (index: number) => void
+  onRemoveItem: (identifier: string | number) => void
   isApprovedContext?: boolean
 }
 
@@ -61,6 +62,8 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
       {/* Mobile Cards Layout (Priority Order: Product -> Quantity w/ Unit -> Unit Price -> Discount -> Net Total -> Delete) */}
       <div className="space-y-3 md:hidden">
         {items.map((row, idx) => {
+          const rowKey = row.id || `mobile-item-${idx}`
+          const itemTarget = row.id ?? idx
           const prod = products.find((p) => p.id === row.productId)
           const calc = calculatedItems[idx] || {
             grossAmount: 0,
@@ -70,10 +73,17 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
           const curStock = prod ? prod.current_stock : 0
           const isInsufficient = prod ? row.quantity > curStock : false
           const allowsDec = Boolean(prod?.allows_decimal_quantity)
+          const isDeleteDisabled =
+            isApprovedContext ||
+            (items.length === 1 &&
+              !row.productId &&
+              (row.quantity <= 1 || isNaN(row.quantity)) &&
+              (row.unitPrice === 0 || isNaN(row.unitPrice)) &&
+              (row.discountValue === 0 || isNaN(row.discountValue)))
 
           return (
             <div
-              key={`mobile-item-${idx}`}
+              key={rowKey}
               className="p-3.5 rounded-xl border border-neutral-200 bg-white shadow-2xs space-y-3"
             >
               {/* Item Header */}
@@ -108,7 +118,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                   onChange={(e) => {
                     const pId = e.target.value
                     const selected = products.find((p) => p.id === pId)
-                    onItemChange(idx, {
+                    onItemChange(itemTarget, {
                       productId: pId,
                       unitPrice: selected ? selected.selling_price : 0,
                       quantity:
@@ -156,7 +166,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                       min={allowsDec ? '0.001' : '1'}
                       value={row.quantity}
                       onChange={(e) =>
-                        onItemChange(idx, { quantity: parseFloat(e.target.value) || 0 })
+                        onItemChange(itemTarget, { quantity: parseFloat(e.target.value) || 0 })
                       }
                       className={`flex-1 min-w-0 p-2 border rounded-lg text-xs text-center font-bold focus:ring-2 ${
                         isInsufficient
@@ -190,7 +200,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                     min="0"
                     value={row.unitPrice}
                     onChange={(e) =>
-                      onItemChange(idx, { unitPrice: parseFloat(e.target.value) || 0 })
+                      onItemChange(itemTarget, { unitPrice: parseFloat(e.target.value) || 0 })
                     }
                     className="w-full p-2 border border-neutral-300 rounded-lg text-xs text-center font-semibold focus:ring-2 focus:ring-emerald-500"
                     required
@@ -208,7 +218,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                   <select
                     value={row.discountType}
                     onChange={(e) =>
-                      onItemChange(idx, {
+                      onItemChange(itemTarget, {
                         discountType: e.target.value as InvoiceDiscountType,
                       })
                     }
@@ -226,7 +236,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                     min="0"
                     value={row.discountValue}
                     onChange={(e) =>
-                      onItemChange(idx, {
+                      onItemChange(itemTarget, {
                         discountValue: parseFloat(e.target.value) || 0,
                       })
                     }
@@ -254,13 +264,13 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
               {!isApprovedContext && (
                 <button
                   type="button"
-                  onClick={() => onRemoveItem(idx)}
-                  disabled={items.length <= 1}
-                  className="w-full py-2 px-3 flex items-center justify-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 border border-rose-200 rounded-lg transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  onClick={() => onRemoveItem(itemTarget)}
+                  disabled={isDeleteDisabled}
+                  className="w-full py-2.5 px-3 flex items-center justify-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 border border-rose-200 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                   title="حذف البند"
                   aria-label="حذف البند"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <Trash2 className="w-4 h-4 text-rose-600 pointer-events-none" />
                   <span>حذف هذا البند</span>
                 </button>
               )}
@@ -288,6 +298,8 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
             </thead>
             <tbody className="divide-y divide-neutral-100 bg-white">
               {items.map((row, idx) => {
+                const rowKey = row.id || `desktop-item-${idx}`
+                const itemTarget = row.id ?? idx
                 const prod = products.find((p) => p.id === row.productId)
                 const calc = calculatedItems[idx] || {
                   grossAmount: 0,
@@ -297,10 +309,17 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                 const curStock = prod ? prod.current_stock : 0
                 const isInsufficient = prod ? row.quantity > curStock : false
                 const allowsDec = Boolean(prod?.allows_decimal_quantity)
+                const isDeleteDisabled =
+                  isApprovedContext ||
+                  (items.length === 1 &&
+                    !row.productId &&
+                    (row.quantity <= 1 || isNaN(row.quantity)) &&
+                    (row.unitPrice === 0 || isNaN(row.unitPrice)) &&
+                    (row.discountValue === 0 || isNaN(row.discountValue)))
 
                 return (
                   <tr
-                    key={`desktop-item-${idx}`}
+                    key={rowKey}
                     className="hover:bg-neutral-50/70 transition-colors"
                   >
                     {/* 1. Product selector & stock badge */}
@@ -310,7 +329,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                         onChange={(e) => {
                           const pId = e.target.value
                           const selected = products.find((p) => p.id === pId)
-                          onItemChange(idx, {
+                          onItemChange(itemTarget, {
                             productId: pId,
                             unitPrice: selected ? selected.selling_price : 0,
                             quantity:
@@ -371,7 +390,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                           min={allowsDec ? '0.001' : '1'}
                           value={row.quantity}
                           onChange={(e) =>
-                            onItemChange(idx, { quantity: parseFloat(e.target.value) || 0 })
+                            onItemChange(itemTarget, { quantity: parseFloat(e.target.value) || 0 })
                           }
                           className={`flex-1 min-w-0 p-2 border rounded-lg text-xs text-center font-bold focus:ring-2 ${
                             isInsufficient
@@ -402,7 +421,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                         min="0"
                         value={row.unitPrice}
                         onChange={(e) =>
-                          onItemChange(idx, { unitPrice: parseFloat(e.target.value) || 0 })
+                          onItemChange(itemTarget, { unitPrice: parseFloat(e.target.value) || 0 })
                         }
                         className="w-full p-2 border border-neutral-300 rounded-lg text-xs text-center font-semibold focus:ring-2 focus:ring-emerald-500"
                         required
@@ -416,7 +435,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                         <select
                           value={row.discountType}
                           onChange={(e) =>
-                            onItemChange(idx, {
+                            onItemChange(itemTarget, {
                               discountType: e.target.value as InvoiceDiscountType,
                             })
                           }
@@ -434,7 +453,7 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                           min="0"
                           value={row.discountValue}
                           onChange={(e) =>
-                            onItemChange(idx, {
+                            onItemChange(itemTarget, {
                               discountValue: parseFloat(e.target.value) || 0,
                             })
                           }
@@ -461,13 +480,13 @@ export const InvoiceLineItems: React.FC<InvoiceLineItemsProps> = ({
                       <td className="p-2.5 text-center">
                         <button
                           type="button"
-                          onClick={() => onRemoveItem(idx)}
-                          disabled={items.length <= 1}
-                          className="action-btn-pill action-btn-pill-danger disabled:opacity-30 disabled:pointer-events-none"
+                          onClick={() => onRemoveItem(itemTarget)}
+                          disabled={isDeleteDisabled}
+                          className="action-btn-pill action-btn-pill-danger disabled:opacity-30 disabled:cursor-not-allowed"
                           title="حذف البند"
                           aria-label="حذف البند"
                         >
-                          <Trash2 className="w-3.5 h-3.5 text-[#DC2626]" />
+                          <Trash2 className="w-3.5 h-3.5 text-[#DC2626] pointer-events-none" />
                         </button>
                       </td>
                     )}

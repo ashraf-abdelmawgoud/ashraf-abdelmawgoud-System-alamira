@@ -20,7 +20,7 @@ export const InvoicePrintTemplate = forwardRef<HTMLDivElement, InvoicePrintTempl
         id={isPrintMode ? 'print-area' : undefined}
         dir="rtl"
         lang="ar"
-        className={`invoice-sheet bg-white text-[#0f172a] box-border select-text font-sans ${
+        className={`invoice-sheet invoice-print-root bg-white text-[#0f172a] box-border select-text font-sans ${
           isPrintMode
             ? 'w-full print:block p-0'
             : 'w-[210mm] min-h-[297mm] p-[10mm_12mm] mx-auto shadow-xl rounded-xs'

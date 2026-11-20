@@ -213,6 +213,33 @@
   color: #B91C1C;
 }
 
+/* Scoped Professional Typography for Al-Amira Invoice Engine */
+.invoice-print-root {
+  direction: rtl;
+  text-align: right;
+  letter-spacing: normal !important;
+}
+
+.invoice-print-root * {
+  letter-spacing: normal;
+}
+
+.invoice-print-root bdi,
+.invoice-print-root [dir="ltr"] {
+  unicode-bidi: isolate;
+}
+
+.invoice-print-root table.print-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.invoice-print-root table.print-table th,
+.invoice-print-root table.print-table td {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
 /* Official A4 Print Styling (Parity with Al-Amira V1) */
 @media print {
   @page {

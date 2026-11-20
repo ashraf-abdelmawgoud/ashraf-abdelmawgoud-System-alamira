@@ -92,19 +92,28 @@ export function printInvoice(element: HTMLElement | null): boolean {
     `);
     frameDoc.close();
 
+    const cleanup = () => {
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 1000);
+    };
+
     const triggerPrint = () => {
       try {
+        if (iframe.contentWindow) {
+          iframe.contentWindow.addEventListener('afterprint', cleanup);
+        }
         iframe.contentWindow?.focus();
         iframe.contentWindow?.print();
       } catch (printErr) {
         console.error('Iframe print error:', printErr);
         window.print();
+        cleanup();
       } finally {
-        setTimeout(() => {
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
-          }
-        }, 1500);
+        // Safe fallback cleanup if afterprint does not fire within 2 minutes
+        setTimeout(cleanup, 120000);
       }
     };
 

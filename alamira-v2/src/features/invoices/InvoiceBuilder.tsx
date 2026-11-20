@@ -22,6 +22,18 @@ import { canViewExactStock } from '@/auth/rbac'
 import { InvoiceLineItems, LineItemFormState } from './InvoiceLineItems'
 import { InvoiceTotals } from './InvoiceTotals'
 
+const generateLineItemId = () =>
+  `item_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+
+const createEmptyLineItem = (): LineItemFormState => ({
+  id: generateLineItemId(),
+  productId: '',
+  quantity: 1,
+  unitPrice: 0,
+  discountType: 'none',
+  discountValue: 0,
+})
+
 interface InvoiceBuilderProps {
   initialInvoice?: SalesInvoice | null
   customers: Customer[]
@@ -65,10 +77,11 @@ export const InvoiceBuilder: React.FC<InvoiceBuilderProps> = ({
     initialInvoice ? initialInvoice.additional_charges : 0
   )
 
-  // Line items state
+  // Line items state with stable unique identifiers
   const [items, setItems] = useState<LineItemFormState[]>(() => {
     if (initialInvoice && initialInvoice.items && initialInvoice.items.length > 0) {
       return initialInvoice.items.map((it) => ({
+        id: it.id || generateLineItemId(),
         productId: it.product_id,
         quantity: it.quantity,
         unitPrice: it.unit_price,
@@ -76,15 +89,7 @@ export const InvoiceBuilder: React.FC<InvoiceBuilderProps> = ({
         discountValue: it.discount_value,
       }))
     }
-    return [
-      {
-        productId: '',
-        quantity: 1,
-        unitPrice: 0,
-        discountType: 'none',
-        discountValue: 0,
-      },
-    ]
+    return [createEmptyLineItem()]
   })
 
   const [loading, setLoading] = useState(false)
@@ -103,28 +108,41 @@ export const InvoiceBuilder: React.FC<InvoiceBuilderProps> = ({
   }
 
   // Handle line-item mutation
-  const handleItemChange = (index: number, updated: Partial<LineItemFormState>) => {
-    const newItems = [...items]
-    newItems[index] = { ...newItems[index], ...updated }
-    setItems(newItems)
+  const handleItemChange = (
+    identifier: string | number,
+    updated: Partial<LineItemFormState>
+  ) => {
+    setItems((prev) =>
+      prev.map((item, idx) => {
+        const matches =
+          typeof identifier === 'string'
+            ? item.id === identifier
+            : idx === identifier
+        if (matches) {
+          return { ...item, ...updated }
+        }
+        return item
+      })
+    )
   }
 
   const handleAddItem = () => {
-    setItems([
-      ...items,
-      {
-        productId: '',
-        quantity: 1,
-        unitPrice: 0,
-        discountType: 'none',
-        discountValue: 0,
-      },
-    ])
+    setItems((prev) => [...prev, createEmptyLineItem()])
   }
 
-  const handleRemoveItem = (index: number) => {
-    if (items.length <= 1) return
-    setItems(items.filter((_, i) => i !== index))
+  const handleRemoveItem = (identifier: string | number) => {
+    setItems((prev) => {
+      // If only 1 item in list, reset it to clean empty state so user can clear/remove that product
+      if (prev.length <= 1) {
+        return [createEmptyLineItem()]
+      }
+      // If multiple items, remove the targeted item
+      return prev.filter((item, idx) =>
+        typeof identifier === 'string'
+          ? item.id !== identifier
+          : idx !== identifier
+      )
+    })
   }
 
   // Calculate live totals using verified domain function

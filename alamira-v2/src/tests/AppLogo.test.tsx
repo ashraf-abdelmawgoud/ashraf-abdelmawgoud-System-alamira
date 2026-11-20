@@ -49,4 +49,35 @@ describe('AppLogo Component & Brand Asset Verification', () => {
     expect(badge).toHaveClass('bg-white')
     expect(badge).toContainElement(screen.getByRole('img'))
   })
+
+  it('5. Verifies official company assets and PWA icons exist in public directory', async () => {
+    const fs = await import('fs')
+    const path = await import('path')
+    const publicDir = path.resolve(__dirname, '../../public')
+
+    const requiredAssets = [
+      'logo.png',
+      'logo-full.png',
+      'logo-transparent.png',
+      'favicon.ico',
+      'favicon-32x32.png',
+      'favicon-16x16.png',
+      'apple-touch-icon.png',
+      'pwa-192x192.png',
+      'pwa-512x512.png',
+      'manifest.webmanifest',
+      'manifest.json',
+      'favicon.svg',
+    ]
+
+    for (const asset of requiredAssets) {
+      expect(fs.existsSync(path.join(publicDir, asset)), `Missing asset: ${asset}`).toBe(true)
+    }
+
+    // Verify manifest contents
+    const manifest = JSON.parse(fs.readFileSync(path.join(publicDir, 'manifest.webmanifest'), 'utf-8'))
+    expect(manifest.name).toBe('الأميرة للتوريدات والتجارة العامة')
+    expect(manifest.short_name).toBe('الأميرة')
+    expect(manifest.icons.length).toBeGreaterThanOrEqual(4)
+  })
 })

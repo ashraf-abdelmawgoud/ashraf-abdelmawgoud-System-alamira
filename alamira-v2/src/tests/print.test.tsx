@@ -227,7 +227,7 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(screen.getByText('STEEL-001')).toBeInTheDocument();
       expect(screen.getByText('2.5')).toBeInTheDocument();
       expect(screen.getByText('-250.00')).toBeInTheDocument();
-      expect(screen.getByText('4750.00 ج.م')).toBeInTheDocument();
+      expect(screen.getByText('4750.00')).toBeInTheDocument();
     });
 
     it('omits discount column when no item has discount to optimize layout width', () => {
@@ -238,7 +238,7 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(screen.getByText('القيمة الإجمالية')).toBeInTheDocument();
       expect(screen.getByText('CEMENT-001')).toBeInTheDocument();
       expect(screen.getByText('10')).toBeInTheDocument();
-      expect(screen.getByText('1000.00 ج.م')).toBeInTheDocument();
+      expect(screen.getByText('1000.00')).toBeInTheDocument();
     });
 
     it('renders Totals table with conditional rows, Arabic Tafqeet, and automated approval statement', () => {
@@ -282,13 +282,13 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(screen.getByText('اعتماد الإدارة وختم الشركة')).toBeInTheDocument();
 
       // Branches verification
-      expect(screen.getByText('فرع قنا')).toBeInTheDocument();
+      expect(screen.getByText(/فرع قنا/)).toBeInTheDocument();
       expect(screen.getByText('قنا - م الوقف')).toBeInTheDocument();
       expect(screen.queryByText('قنا - بجوار مركز شباب عزبة علام')).not.toBeInTheDocument();
       expect(screen.getByText('01008949310')).toBeInTheDocument();
       expect(screen.getAllByText('01001239995').length).toBeGreaterThanOrEqual(1);
 
-      expect(screen.getByText('فرع الغردقة')).toBeInTheDocument();
+      expect(screen.getByText(/فرع الغردقة/)).toBeInTheDocument();
       expect(screen.getByText('الغردقة - شيراتون')).toBeInTheDocument();
       expect(screen.getByText('01020680007')).toBeInTheDocument();
     });
@@ -464,6 +464,155 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       // V1 audit confirmed no thermal printer template exists in the system
       const isThermalPrintingSupportedInV1 = false;
       expect(isThermalPrintingSupportedInV1).toBe(false);
+    });
+  });
+
+  describe('6. Master Visual QA & Typography Scenarios (Phases 3, 6, 8, 9)', () => {
+    it('Scenario D: Renders mixed Arabic-numeric-symbol product names like "كيبة2*2*10سم" with BiDi isolation', () => {
+      const stressInvoice: SalesInvoice = {
+        ...sampleInvoiceWithoutDiscounts,
+        id: 'inv-stress-bidi',
+        invoice_number: 'INV-STRESS-001',
+        items: [
+          {
+            id: 'item-bidi-1',
+            invoice_id: 'inv-stress-bidi',
+            product_id: 'prod-bidi-1',
+            product_sku_snapshot: 'BOX-2X2X10',
+            product_name_snapshot: 'كيبة2*2*10سم',
+            unit_snapshot: 'قطعة',
+            quantity: 50,
+            unit_price: 15,
+            discount_type: 'fixed',
+            discount_value: 0,
+            discount_amount: 0,
+            gross_amount: 750,
+            net_amount: 750,
+          },
+          {
+            id: 'item-bidi-2',
+            invoice_id: 'inv-stress-bidi',
+            product_id: 'prod-bidi-2',
+            product_sku_snapshot: 'ALUM-2.5X2.5',
+            product_name_snapshot: 'زاوية ألومنيوم 2.5*2.5 سم عالي الجودة (سمك 1.2 مم)',
+            unit_snapshot: 'متر',
+            quantity: 20.5,
+            unit_price: 45,
+            discount_type: 'fixed',
+            discount_value: 0,
+            discount_amount: 0,
+            gross_amount: 922.5,
+            net_amount: 922.5,
+          },
+        ],
+        gross_amount: 1672.5,
+        subtotal: 1672.5,
+        final_total: 1672.5,
+      };
+
+      const model = mapInvoiceToPrintModel(stressInvoice, mockCustomer);
+      const { container } = render(<InvoicePrintTemplate data={model} />);
+
+      // Verify exact name is present
+      expect(screen.getByText('كيبة2*2*10سم')).toBeInTheDocument();
+      expect(
+        screen.getByText('زاوية ألومنيوم 2.5*2.5 سم عالي الجودة (سمك 1.2 مم)')
+      ).toBeInTheDocument();
+
+      // Verify bdi isolation wrapping
+      const bdiElements = container.querySelectorAll('tbody td bdi');
+      expect(bdiElements.length).toBeGreaterThanOrEqual(4);
+
+      // Verify no collision: cell padding classes present
+      const nameCells = container.querySelectorAll('.print-table tbody td.text-right');
+      nameCells.forEach((cell) => {
+        expect(cell).toHaveClass('px-2.5');
+        expect(cell).toHaveClass('py-2');
+      });
+    });
+
+    it('Scenario C: Renders long invoice (30 items) with page break isolation and without container break-inside:avoid', () => {
+      const items30 = Array.from({ length: 30 }, (_, i) => ({
+        id: `item-long-${i + 1}`,
+        invoice_id: 'inv-long-30',
+        product_id: `prod-long-${i + 1}`,
+        product_sku_snapshot: `SKU-${2000 + i}`,
+        product_name_snapshot: `بند توريد رقم ${i + 1} مع تفاصيل المواصفات الفنية المعتمدة للمشروع`,
+        unit_snapshot: i % 3 === 0 ? 'متر مكعب' : i % 2 === 0 ? 'طن' : 'شوال',
+        quantity: (i + 1) * 2,
+        unit_price: 100,
+        discount_type: 'fixed' as const,
+        discount_value: 0,
+        discount_amount: 0,
+        gross_amount: (i + 1) * 200,
+        net_amount: (i + 1) * 200,
+      }));
+
+      const invoice30: SalesInvoice = {
+        ...sampleInvoiceWithoutDiscounts,
+        id: 'inv-long-30',
+        invoice_number: 'INV-30ITEMS-001',
+        items: items30,
+        gross_amount: items30.reduce((acc, it) => acc + it.gross_amount, 0),
+        subtotal: items30.reduce((acc, it) => acc + it.gross_amount, 0),
+        final_total: items30.reduce((acc, it) => acc + it.gross_amount, 0),
+      };
+
+      const model = mapInvoiceToPrintModel(invoice30, mockCustomer);
+      const { container } = render(<InvoicePrintTemplate data={model} />);
+
+      const sheet = container.querySelector('.invoice-sheet');
+      expect(sheet).not.toHaveClass('break-inside-avoid');
+
+      const rows = container.querySelectorAll('.print-table tbody tr');
+      expect(rows.length).toBe(30);
+
+      // Every individual row must avoid breaking inside
+      rows.forEach((row) => {
+        expect(row).toHaveClass('break-inside-avoid');
+      });
+    });
+
+    it('Signature Boxes: Guarantees zero text clipping and removes truncate for long customer names', () => {
+      const longNamedCustomer: Customer = {
+        ...mockCustomer,
+        name: 'مؤسسة النور والهدى للمقاولات والتوريدات العمومية والأعمال الكهروميكانيكية الحديثة',
+      };
+
+      const model = mapInvoiceToPrintModel(sampleInvoiceWithoutDiscounts, longNamedCustomer);
+      const { container } = render(<InvoicePrintFooter data={model} />);
+
+      const customerSignBox = container.querySelectorAll('.print-sign-box')[0];
+      expect(customerSignBox).toHaveClass('min-h-[90px]');
+      expect(customerSignBox).toHaveClass('flex-col');
+      expect(customerSignBox).toHaveClass('justify-between');
+
+      const nameElement = customerSignBox.querySelector('.break-words');
+      expect(nameElement).toBeInTheDocument();
+      expect(nameElement).not.toHaveClass('truncate');
+      expect(nameElement?.textContent).toContain(longNamedCustomer.name);
+    });
+
+    it('Compact Footer: Renders sleek contact strip with proper Qena and Hurghada branches', () => {
+      const model = mapInvoiceToPrintModel(sampleInvoiceWithoutDiscounts, mockCustomer);
+      const { container } = render(<InvoicePrintFooter data={model} />);
+
+      const branchesFooter = container.querySelector('.print-branches-footer');
+      expect(branchesFooter).toBeInTheDocument();
+
+      // Qena
+      expect(screen.getByText(/فرع قنا/)).toBeInTheDocument();
+      expect(screen.getByText('قنا - م الوقف')).toBeInTheDocument();
+      expect(screen.getByText('01008949310')).toBeInTheDocument();
+      expect(screen.getAllByText('01001239995').length).toBeGreaterThanOrEqual(1);
+
+      // Hurghada
+      expect(screen.getByText(/فرع الغردقة/)).toBeInTheDocument();
+      expect(screen.getByText('الغردقة - شيراتون')).toBeInTheDocument();
+      expect(screen.getByText('01020680007')).toBeInTheDocument();
+
+      // Subtle company identity line
+      expect(screen.getByText(/الأميرة للتوريدات والتجارة العامة — نسعد بخدمتكم دائماً/)).toBeInTheDocument();
     });
   });
 });

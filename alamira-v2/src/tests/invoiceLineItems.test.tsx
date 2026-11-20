@@ -113,9 +113,92 @@ describe('InvoiceLineItems Redesign (Task 1)', () => {
     // Net line amount
     expect(screen.getAllByText(/250(\.00)?/i).length).toBeGreaterThan(0)
 
-    // Delete action button exists
+    // Delete action button exists and is active because product is selected
     const deleteButtons = screen.getAllByRole('button', { name: /حذف البند/i })
     expect(deleteButtons.length).toBeGreaterThan(0)
+    expect(deleteButtons[0]).not.toBeDisabled()
+    fireEvent.click(deleteButtons[0])
+    expect(onRemoveItem).toHaveBeenCalled()
+  })
+
+  it('allows deleting/clearing an item when multiple items exist or when product is selected', () => {
+    const onRemoveItem = vi.fn()
+    const multipleItems: LineItemFormState[] = [
+      {
+        id: 'item-1',
+        productId: 'prod-1',
+        quantity: 5,
+        unitPrice: 50,
+        discountType: 'none',
+        discountValue: 0,
+      },
+      {
+        id: 'item-2',
+        productId: 'prod-2',
+        quantity: 2,
+        unitPrice: 120,
+        discountType: 'none',
+        discountValue: 0,
+      },
+    ]
+
+    const multipleCalculated: CalculatedLineItem[] = [
+      calculateLineItem(multipleItems[0]),
+      calculateLineItem(multipleItems[1]),
+    ]
+
+    render(
+      <InvoiceLineItems
+        items={multipleItems}
+        calculatedItems={multipleCalculated}
+        products={mockProducts}
+        onItemChange={vi.fn()}
+        onAddItem={vi.fn()}
+        onRemoveItem={onRemoveItem}
+      />
+    )
+
+    // Verify delete buttons exist for both rows and are enabled
+    const deleteButtons = screen.getAllByRole('button', { name: /حذف البند/i })
+    expect(deleteButtons.length).toBeGreaterThanOrEqual(2)
+    expect(deleteButtons[0]).not.toBeDisabled()
+    expect(deleteButtons[1]).not.toBeDisabled()
+
+    // Click delete on first item
+    fireEvent.click(deleteButtons[0])
+    expect(onRemoveItem).toHaveBeenCalledWith('item-1')
+  })
+
+  it('disables delete button only when a single row is completely blank', () => {
+    const blankItems: LineItemFormState[] = [
+      {
+        id: 'item-blank',
+        productId: '',
+        quantity: 1,
+        unitPrice: 0,
+        discountType: 'none',
+        discountValue: 0,
+      },
+    ]
+
+    const blankCalculated: CalculatedLineItem[] = [
+      calculateLineItem(blankItems[0]),
+    ]
+
+    render(
+      <InvoiceLineItems
+        items={blankItems}
+        calculatedItems={blankCalculated}
+        products={mockProducts}
+        onItemChange={vi.fn()}
+        onAddItem={vi.fn()}
+        onRemoveItem={vi.fn()}
+      />
+    )
+
+    const deleteButtons = screen.getAllByRole('button', { name: /حذف البند/i })
+    expect(deleteButtons.length).toBeGreaterThan(0)
+    expect(deleteButtons[0]).toBeDisabled()
   })
 
   it('renders out-of-stock warning when a zero-stock product is selected', () => {
