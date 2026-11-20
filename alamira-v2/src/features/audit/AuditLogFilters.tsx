@@ -60,7 +60,7 @@ export const AuditLogFilters: React.FC<AuditLogFiltersProps> = ({
             value={filters.search || ''}
             onChange={handleSearchChange}
             placeholder="ابحث برقم المستند، المنفّذ، السبب..."
-            className="w-full pl-4 pr-10 py-2.5 text-xs sm:text-sm bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#0F766E]/20 focus:border-[#0F766E] transition-all placeholder:text-slate-400"
+            className="w-full pl-4 pr-10 py-2.5 text-xs sm:text-sm bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#11243A]/20 focus:border-[#11243A] transition-all placeholder:text-slate-400"
           />
           <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
@@ -101,7 +101,7 @@ export const AuditLogFilters: React.FC<AuditLogFiltersProps> = ({
               variant="ghost"
               size="sm"
               onClick={onReset}
-              className="flex items-center gap-1 text-xs text-[#0F766E] hover:text-[#11243A] px-2 py-1 h-auto"
+              className="flex items-center gap-1 text-xs text-[#11243A] hover:text-[#1E3A5F] px-2 py-1 h-auto"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>إعادة ضبط</span>

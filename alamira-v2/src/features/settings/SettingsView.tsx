@@ -21,8 +21,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const tabs: { id: SettingsTab; label: string; icon: (isActive: boolean) => React.ReactNode }[] = [
     { id: 'company', label: 'بيانات وهوية المنشأة', icon: (active) => <Building2 className={`w-4 h-4 ${active ? 'text-white' : 'text-[#11243A]'}`} /> },
     { id: 'preferences', label: 'تفضيلات التشغيل', icon: (active) => <Sliders className={`w-4 h-4 ${active ? 'text-white' : 'text-[#64748B]'}`} /> },
-    { id: 'backup', label: 'النسخ الاحتياطي واستخراج البيانات', icon: (active) => <Database className={`w-4 h-4 ${active ? 'text-white' : 'text-[#0F766E]'}`} /> },
-    { id: 'users', label: 'إدارة المستخدمين والصلاحيات (محاكاة)', icon: (active) => <Users className={`w-4 h-4 ${active ? 'text-white' : 'text-[#11243A]'}`} /> },
+    { id: 'backup', label: 'النسخ الاحتياطي واستخراج البيانات', icon: (active) => <Database className={`w-4 h-4 ${active ? 'text-white' : 'text-[#11243A]'}`} /> },
+    { id: 'users', label: 'إدارة المستخدمين والصلاحيات', icon: (active) => <Users className={`w-4 h-4 ${active ? 'text-white' : 'text-[#11243A]'}`} /> },
   ];
 
   return (

@@ -82,7 +82,7 @@ export const InvoiceActions: React.FC<InvoiceActionsProps> = ({
             title="اعتماد الفاتورة وخصم المخزون"
             aria-label="اعتماد"
           >
-            <CheckCircle2 className="w-3.5 h-3.5 text-[#0F766E]" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-[#11243A]" />
           </button>
           <button
             type="button"

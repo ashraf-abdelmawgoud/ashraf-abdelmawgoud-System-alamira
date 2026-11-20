@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { Lock, Mail, AlertCircle, Loader2, ShieldCheck } from 'lucide-react'
+import { Lock, Mail, AlertCircle, Loader2 } from 'lucide-react'
 import { useAuth } from '@/auth'
+import { AppLogo } from '@/components/ui'
 
 export const LoginModal: React.FC = () => {
   const { login, authError, clearAuthError } = useAuth()
@@ -45,14 +46,14 @@ export const LoginModal: React.FC = () => {
       dir="rtl"
     >
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden text-right">
-        {/* Header Header Banner */}
-        <div className="bg-[#11243A] px-6 py-6 text-white text-center relative">
-          <div className="mx-auto w-12 h-12 rounded-xl bg-[#0F766E]/30 border border-[#0F766E] flex items-center justify-center mb-3">
-            <ShieldCheck className="w-6 h-6 text-[#14B8A6]" />
+        {/* Header Banner */}
+        <div className="bg-[#11243A] px-6 py-7 text-white text-center relative">
+          <div className="mx-auto inline-flex items-center justify-center bg-white px-5 py-2.5 rounded-xl shadow-md border border-slate-200/80 mb-3.5">
+            <AppLogo size="lg" className="h-9 sm:h-11 w-auto" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight">نظام الأميرة للحلويات والمخبوزات</h1>
+          <h1 className="text-xl font-bold tracking-tight">الأميرة للتوريدات العامة والتجارة</h1>
           <p className="text-xs text-slate-300 mt-1 font-medium">
-            تسجيل الدخول الموحد — الإصدار الثاني (V2)
+            تسجيل الدخول الموحد — منظومة إدارة المبيعات والمخازن V2
           </p>
         </div>
 
@@ -83,7 +84,7 @@ export const LoginModal: React.FC = () => {
                 disabled={isSubmitting}
                 dir="ltr"
                 placeholder="name@company.com"
-                className="w-full px-3 py-2 pr-9 border border-slate-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#0F766E] focus:border-transparent transition-all disabled:bg-slate-50"
+                className="w-full px-3 py-2 pr-9 border border-slate-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#11243A] focus:border-transparent transition-all disabled:bg-slate-50"
                 autoComplete="email"
                 required
               />
@@ -109,7 +110,7 @@ export const LoginModal: React.FC = () => {
                 disabled={isSubmitting}
                 dir="ltr"
                 placeholder="••••••••"
-                className="w-full px-3 py-2 pr-9 border border-slate-300 rounded-lg text-sm text-left focus:outline-none focus:ring-2 focus:ring-[#0F766E] focus:border-transparent transition-all disabled:bg-slate-50"
+                className="w-full px-3 py-2 pr-9 border border-slate-300 rounded-lg text-sm text-left focus:outline-none focus:ring-2 focus:ring-[#11243A] focus:border-transparent transition-all disabled:bg-slate-50"
                 autoComplete="current-password"
                 required
               />
@@ -121,7 +122,7 @@ export const LoginModal: React.FC = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-2.5 px-4 bg-[#0F766E] hover:bg-[#0D655E] text-white font-bold rounded-lg text-sm transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+              className="w-full py-2.5 px-4 bg-[#11243A] hover:bg-[#1E3A5F] text-white font-bold rounded-lg text-sm transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting ? (
                 <>

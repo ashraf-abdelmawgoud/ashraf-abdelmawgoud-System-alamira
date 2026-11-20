@@ -167,7 +167,7 @@ export const InventoryOverview: React.FC<InventoryOverviewProps> = ({
           <Button
             variant="outline"
             onClick={onOpenNewAdjustment}
-            className="flex-1 sm:flex-none justify-center border-[#CBD5E1] text-[#11243A] hover:bg-slate-50 hover:text-[#0F766E]"
+            className="flex-1 sm:flex-none justify-center border-[#CBD5E1] text-[#11243A] hover:bg-slate-50 hover:text-[#11243A]"
           >
             تسوية جردية
           </Button>
@@ -180,7 +180,7 @@ export const InventoryOverview: React.FC<InventoryOverviewProps> = ({
           title="إجمالي قيمة المخزون (بالتكلفة)"
           value={formatCurrency(totalInventoryValue)}
           subtitle={`إجمالي الأصناف: ${formatNumber(totalItemsCount)} صنف`}
-          icon={<CircleDollarSign className="w-5 h-5 text-[#0F766E]" />}
+          icon={<CircleDollarSign className="w-5 h-5 text-[#11243A]" />}
           variant="emerald"
         />
         <StatCard

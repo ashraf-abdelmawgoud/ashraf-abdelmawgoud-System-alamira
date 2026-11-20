@@ -110,7 +110,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onNotification }) => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[#E2E8F0] no-print">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-[#0F766E] shrink-0" />
+            <BarChart3 className="w-5 h-5 text-[#11243A] shrink-0" />
             <h1 className="text-xl sm:text-2xl font-bold text-[#11243A] tracking-tight">
               التقارير العامة والمؤشرات
             </h1>

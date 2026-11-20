@@ -158,7 +158,7 @@ export const AuditLogView: React.FC = () => {
               <span>إدارة الرقابة والأمان (Super Admin)</span>
             </span>
             <span className="inline-flex items-center gap-1.5 text-xs text-slate-700 bg-slate-100/90 px-2.5 py-0.5 rounded-lg border border-slate-200 font-medium">
-              <Clock className="w-3.5 h-3.5 text-[#0F766E]" />
+              <Clock className="w-3.5 h-3.5 text-[#11243A]" />
               <span>{QENA_TIMEZONE_LABEL}</span>
             </span>
           </div>
@@ -175,7 +175,7 @@ export const AuditLogView: React.FC = () => {
             variant="outline"
             size="sm"
             onClick={handleExportExcel}
-            className="text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+            className="text-xs text-[#11243A] border-slate-300 hover:bg-slate-50"
             title="تصدير السجلات إلى ملف إكسل XLSX"
           >
             تصدير Excel

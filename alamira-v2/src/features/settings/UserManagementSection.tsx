@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react'
 import {
   Users,
   UserPlus,
-  Shield,
   ShieldCheck,
   CheckCircle2,
   XCircle,
@@ -12,12 +11,18 @@ import {
   Search,
   AlertCircle,
   UserCheck,
+  Eye,
+  EyeOff,
+  Lock,
+  Loader2,
 } from 'lucide-react'
 import { User, Role } from '@/types'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { useAuth } from '@/auth'
 import { dataService } from '@/services/dataService'
+import { isPrimaryAdmin } from '@/auth/rbac'
+import { cn } from '@/lib/utils'
 
 interface UserManagementSectionProps {
   onNotification?: (msg: string, type?: 'success' | 'error' | 'info') => void
@@ -27,6 +32,9 @@ interface UserFormData {
   name: string
   username: string
   email: string
+  phone?: string
+  password?: string
+  confirmPassword?: string
   role: Role
   title: string
   is_active: boolean
@@ -36,6 +44,9 @@ const INITIAL_FORM: UserFormData = {
   name: '',
   username: '',
   email: '',
+  phone: '',
+  password: '',
+  confirmPassword: '',
   role: 'SALES_OPERATOR',
   title: '',
   is_active: true,
@@ -53,10 +64,11 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
   const [formData, setFormData] = useState<UserFormData>(INITIAL_FORM)
+  const [showPassword, setShowPassword] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Load users from mock service
+  // Load users from service
   const loadUsers = useCallback(async () => {
     setLoading(true)
     try {
@@ -76,6 +88,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
   const handleOpenAddModal = () => {
     setEditingUserId(null)
     setFormData(INITIAL_FORM)
+    setShowPassword(false)
     setFormError(null)
     setIsModalOpen(true)
   }
@@ -86,10 +99,14 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
       name: u.name,
       username: u.username,
       email: u.email || '',
+      phone: u.phone || '',
+      password: '',
+      confirmPassword: '',
       role: u.role,
       title: u.title || '',
       is_active: u.is_active !== false,
     })
+    setShowPassword(false)
     setFormError(null)
     setIsModalOpen(true)
   }
@@ -101,6 +118,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
     const cleanName = formData.name.trim()
     const cleanUsername = formData.username.trim().toLowerCase()
     const cleanEmail = formData.email.trim().toLowerCase()
+    const cleanPhone = formData.phone?.trim() || ''
 
     if (!cleanName) {
       setFormError('يرجى إدخال اسم المستخدم بالكامل')
@@ -112,23 +130,69 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
       return
     }
 
-    if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    if (!cleanEmail) {
+      setFormError('يرجى إدخال البريد الإلكتروني للمستخدم')
+      return
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       setFormError('صيغة البريد الإلكتروني غير صالحة (مثال: user@alamira.com)')
       return
+    }
+
+    // Creating new user requires explicit administrator-supplied password with strong policy
+    if (!editingUserId) {
+      const cleanPassword = formData.password?.trim() || ''
+      const cleanConfirm = formData.confirmPassword?.trim() || ''
+
+      if (!cleanPassword) {
+        setFormError('يرجى إدخال كلمة المرور الأولية لحساب مسؤول المبيعات')
+        return
+      }
+
+      if (cleanPassword.length < 8) {
+        setFormError('يجب أن تتكون كلمة المرور من 8 أحرف على الأقل')
+        return
+      }
+
+      const hasLetter = /[a-zA-Z\u0600-\u06FF]/.test(cleanPassword)
+      const hasNumberOrSymbol = /[0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(cleanPassword)
+      if (!hasLetter || !hasNumberOrSymbol) {
+        setFormError('يجب أن تحتوي كلمة المرور على أحرف وأرقام أو رموز لضمان أمان الحساب')
+        return
+      }
+
+      if (cleanPassword !== cleanConfirm) {
+        setFormError('كلمتا المرور غير متطابقتين، يرجى إعادة التأكيد بدقة')
+        return
+      }
+    }
+
+    // Primary admin protection
+    if (editingUserId && isPrimaryAdmin(editingUserId)) {
+      if (formData.is_active === false) {
+        setFormError('لا يمكن تعطيل أو حذف حساب المدير الأساسي.')
+        return
+      }
+      if (formData.role !== 'ADMIN') {
+        setFormError('لا يمكن تعديل صلاحيات أو خفض دور حساب المدير الأساسي.')
+        return
+      }
     }
 
     setIsSubmitting(true)
     try {
       if (editingUserId) {
+        const isTargetPrimary = isPrimaryAdmin(editingUserId)
         const updated = await dataService.updateUser(
           editingUserId,
           {
             name: cleanName,
             username: cleanUsername,
             email: cleanEmail || undefined,
-            role: formData.role,
+            role: isTargetPrimary ? 'ADMIN' : formData.role,
             title: formData.title.trim(),
-            is_active: formData.is_active,
+            is_active: isTargetPrimary ? true : formData.is_active,
           },
           currentUser
         )
@@ -137,20 +201,22 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
           switchUser(updated)
         }
       } else {
-        const created = await dataService.createUser(
+        // Direct administrator-created sales operator account via trusted server-side Edge Function
+        const created = await dataService.createSalesOperator(
           {
-            name: cleanName,
+            full_name: cleanName,
+            email: cleanEmail,
+            password: formData.password?.trim(),
             username: cleanUsername,
-            email: cleanEmail || undefined,
-            role: formData.role,
-            title: formData.title.trim(),
-            is_active: formData.is_active,
+            phone: cleanPhone || undefined,
           },
           currentUser
         )
-        onNotification?.(`تمت إضافة المستخدم (${created.name}) بنجاح`, 'success')
+        onNotification?.(`تم إنشاء وتفعيل حساب مسؤول المبيعات (${created.name}) بنجاح بكلمة المرور المحددة`, 'success')
       }
 
+      // Clear password fields immediately from state upon success
+      setFormData(INITIAL_FORM)
       setIsModalOpen(false)
       await loadUsers()
       await refreshUsers()
@@ -162,6 +228,11 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
   }
 
   const handleToggleActive = async (targetUser: User) => {
+    if (isPrimaryAdmin(targetUser.id)) {
+      onNotification?.('لا يمكن تعطيل أو حذف حساب المدير الأساسي.', 'error')
+      return
+    }
+
     try {
       const updated = await dataService.toggleUserActive(targetUser.id, currentUser)
       onNotification?.(
@@ -202,23 +273,11 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
     )
   })
 
+  const isEditingPrimaryAdmin = Boolean(editingUserId && isPrimaryAdmin(editingUserId))
+
   return (
     <div className="space-y-6">
-      {/* 1. Development Simulation Disclaimer Banner */}
-      <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 flex items-start gap-3 text-xs text-amber-900 shadow-xs">
-        <Shield className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <p className="font-bold text-sm text-amber-950">
-            محاكاة تشغيلية لإدارة المستخدمين والأدوار (Development Simulation Only)
-          </p>
-          <p className="text-amber-800 leading-relaxed">
-            تُستخدم هذه الشاشة لتجربة منظومة الصلاحيات وأدوار الموظفين محلياً (Role-Based Access Control).
-            يمكنك إضافة وتعديل مستخدمين تجريبيين، تعطيل الحسابات، وتبديل هوية المستخدم الحالي لفحص استجابة النظام والحواجز الأمنية. التغييرات تحفظ في ذاكرة الجلسة المحلية (Mock Store) وليست مصادقة دخول أمنية إنتاجية.
-          </p>
-        </div>
-      </div>
-
-      {/* 2. Currently Selected Mock User Card */}
+      {/* 1. Currently Selected User Card */}
       <div className="bg-[#11243A] text-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-700">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
@@ -234,11 +293,16 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                   @{currentUser.username}
                 </span>
                 {currentUser.email && (
-                  <span className="text-xs text-teal-300 font-mono" dir="ltr">
+                  <span className="text-xs text-slate-300 font-mono" dir="ltr">
                     ({currentUser.email})
                   </span>
                 )}
-                {currentUser.is_active ? (
+                {isPrimaryAdmin(currentUser.id) ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                    المدير الأساسي (محمي)
+                  </span>
+                ) : currentUser.is_active ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                     <CheckCircle2 className="w-3 h-3" />
                     حساب نشط
@@ -253,7 +317,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               <div className="text-xs text-slate-300 mt-1 flex items-center gap-2">
                 <span>{currentUser.title || (currentUser.role === 'ADMIN' ? 'مدير النظام' : 'مسؤول مبيعات')}</span>
                 <span>•</span>
-                <span className="text-[#0F766E] bg-emerald-950/80 px-2 py-0.5 rounded text-[11px] font-bold text-emerald-400">
+                <span className="bg-white/10 px-2 py-0.5 rounded text-[11px] font-bold text-slate-200">
                   {currentUser.role === 'ADMIN' ? 'صلاحيات كاملة (Admin)' : 'صلاحيات مبيعات مقيدة (Sales Operator)'}
                 </span>
               </div>
@@ -269,20 +333,20 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
         </div>
       </div>
 
-      {/* 3. Users Management Table & Actions */}
+      {/* 2. Users Management Table & Actions */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {/* Action Header & Search */}
         <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold text-[#11243A] flex items-center gap-2">
-              <Users className="w-4 h-4 text-[#0F766E]" />
-              <span>دليل مستخدمي النظام التجريبيين</span>
+              <Users className="w-4 h-4 text-[#11243A]" />
+              <span>سجل المستخدمين المصرح لهم</span>
               <span className="text-xs text-slate-500 font-normal">
                 ({filteredUsers.length} مستخدم)
               </span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              إدارة بيانات وحسابات الموظفين، تبديل الأدوار، وتفعيل أو تعطيل الصلاحيات
+              إدارة بيانات وحسابات الموظفين، إضافة مسؤولي المبيعات، ومتابعة الصلاحيات وحالة الحسابات
             </p>
           </div>
 
@@ -294,7 +358,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                 placeholder="بحث بالاسم أو اسم الدخول..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl pr-8 pl-3 py-1.5 focus:outline-none focus:border-[#0F766E] transition-colors"
+                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl pr-8 pl-3 py-1.5 focus:outline-none focus:border-[#11243A] transition-colors"
               />
             </div>
             <Button
@@ -305,7 +369,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               className="inline-flex items-center gap-1.5"
             >
               <UserPlus className="w-3.5 h-3.5" />
-              <span>إضافة مستخدم تجريبي</span>
+              <span>إضافة مسؤول مبيعات</span>
             </Button>
           </div>
         </div>
@@ -338,14 +402,16 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               ) : (
                 filteredUsers.map((user) => {
                   const isCurrent = currentUser.id === user.id
+                  const isPrimary = isPrimaryAdmin(user.id)
                   const isActive = user.is_active !== false
 
                   return (
                     <tr
                       key={user.id}
-                      className={`hover:bg-slate-50/70 transition-colors ${
-                        isCurrent ? 'bg-slate-50/90 font-medium' : ''
-                      }`}
+                      className={cn(
+                        'hover:bg-slate-50/70 transition-colors',
+                        isCurrent && 'bg-slate-50/90 font-medium'
+                      )}
                     >
                       {/* Name & Username */}
                       <td className="py-3 px-4">
@@ -354,11 +420,17 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                             {user.name.charAt(0)}
                           </div>
                           <div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-bold text-[#11243A]">
                                 {user.name}
                               </span>
-                              {isCurrent && (
+                              {isPrimary && (
+                                <span className="inline-flex items-center gap-0.5 text-[10px] bg-amber-50 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded font-bold">
+                                  <ShieldCheck className="w-3 h-3 text-amber-600" />
+                                  المدير الأساسي
+                                </span>
+                              )}
+                              {isCurrent && !isPrimary && (
                                 <span className="text-[10px] bg-slate-200 text-slate-800 px-1.5 py-0.2 rounded font-bold">
                                   الحالي
                                 </span>
@@ -371,7 +443,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                               {user.email && (
                                 <>
                                   <span className="text-slate-300">•</span>
-                                  <span className="text-[11px] text-teal-700 font-mono" dir="ltr">
+                                  <span className="text-[11px] text-slate-600 font-mono" dir="ltr">
                                     {user.email}
                                   </span>
                                 </>
@@ -383,19 +455,24 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
 
                       {/* Title */}
                       <td className="py-3 px-4 text-slate-700">
-                        {user.title || '—'}
+                        {user.title || (user.role === 'ADMIN' ? 'مدير عام' : 'مسؤول مبيعات')}
                       </td>
 
                       {/* Role Badge */}
                       <td className="py-3 px-4">
-                        {user.role === 'ADMIN' ? (
+                        {isPrimary ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-950 border border-amber-300">
+                            <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
+                            المدير الأساسي (محمي)
+                          </span>
+                        ) : user.role === 'ADMIN' ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-[#11243A] border border-slate-300">
-                            <ShieldCheck className="w-3 h-3 text-[#0F766E]" />
+                            <ShieldCheck className="w-3 h-3 text-[#11243A]" />
                             مدير النظام (Admin)
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
-                            <Users className="w-3 h-3 text-teal-600" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                            <Users className="w-3 h-3 text-slate-600" />
                             مسؤول مبيعات (Sales)
                           </span>
                         )}
@@ -419,17 +496,17 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       {/* Actions */}
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                          {/* Switch Account Button */}
+                          {/* Switch Account Button (Only in Mock mode for testing) */}
                           {isMock && (
                             <button
                               type="button"
                               onClick={() => handleSwitchUser(user)}
                               disabled={isCurrent}
                               title={isCurrent ? 'هذا هو الحساب المختار حالياً' : `التبديل إلى حساب ${user.name}`}
-                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer ${
                                 isCurrent
                                   ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-default'
-                                  : 'bg-[#11243A] text-white hover:bg-[#0F766E]'
+                                  : 'bg-[#11243A] text-white hover:bg-slate-800'
                               }`}
                             >
                               <ArrowLeftRight className="w-3 h-3" />
@@ -442,7 +519,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                             type="button"
                             onClick={() => handleOpenEditModal(user)}
                             title="تعديل بيانات المستخدم والدور"
-                            className="p-1 rounded-lg text-slate-600 hover:text-[#11243A] hover:bg-slate-100 transition-colors cursor-pointer border border-transparent hover:border-slate-200"
+                            className="p-1.5 rounded-lg text-slate-600 hover:text-[#11243A] hover:bg-slate-100 transition-colors cursor-pointer border border-transparent hover:border-slate-200"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
@@ -450,13 +527,23 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                           {/* Toggle Active Button */}
                           <button
                             type="button"
+                            disabled={isPrimary}
                             onClick={() => handleToggleActive(user)}
-                            title={isActive ? 'تعطيل الحساب' : 'تفعيل الحساب'}
-                            className={`p-1 rounded-lg transition-colors cursor-pointer border ${
-                              isActive
-                                ? 'text-rose-600 hover:bg-rose-50 border-transparent hover:border-rose-200'
-                                : 'text-emerald-600 hover:bg-emerald-50 border-transparent hover:border-emerald-200'
-                            }`}
+                            title={
+                              isPrimary
+                                ? 'لا يمكن تعطيل أو حذف حساب المدير الأساسي.'
+                                : isActive
+                                  ? 'تعطيل الحساب'
+                                  : 'تفعيل الحساب'
+                            }
+                            className={cn(
+                              'p-1.5 rounded-lg transition-colors border',
+                              isPrimary
+                                ? 'text-slate-300 border-transparent cursor-not-allowed opacity-40'
+                                : isActive
+                                  ? 'text-rose-600 hover:bg-rose-50 border-transparent hover:border-rose-200 cursor-pointer'
+                                  : 'text-emerald-600 hover:bg-emerald-50 border-transparent hover:border-emerald-200 cursor-pointer'
+                            )}
                           >
                             <Power className="w-3.5 h-3.5" />
                           </button>
@@ -471,17 +558,50 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
         </div>
       </div>
 
-      {/* 4. Add / Edit User Modal */}
+      {/* 3. Add / Edit User Modal */}
       <Modal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={editingUserId ? 'تعديل بيانات المستخدم التجريبي' : 'إضافة مستخدم تجريبي جديد'}
+        onClose={() => {
+          setIsModalOpen(false)
+          setFormData(INITIAL_FORM)
+        }}
+        title={
+          editingUserId
+            ? isEditingPrimaryAdmin
+              ? 'تعديل بيانات المدير الأساسي (محمي)'
+              : 'تعديل بيانات المستخدم'
+            : 'إضافة مسؤول مبيعات جديد'
+        }
       >
         <form onSubmit={handleSaveUser} className="space-y-4 text-right">
           {formError && (
             <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
               <span>{formError}</span>
+            </div>
+          )}
+
+          {!editingUserId && (
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-xs flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-[#11243A] shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-[#11243A]">تنبيه إداري: إنشاء الحساب المباشر</p>
+                <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                  يتم إنشاء هذا الحساب واعتماده إدارياً بكلمة مرور أولية محددة، دون التحقق المستقل من ملكية البريد الإلكتروني. يُرجى تسليم بيانات الدخول لمسؤول المبيعات بشكل آمن ومطالبته بتغييرها فور تسجيل الدخول الأول.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {isEditingPrimaryAdmin && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">حساب المدير الأساسي محمي بالكامل</p>
+                <p className="text-[11px] text-amber-800 mt-0.5">
+                  لا يمكن خفض دور هذا الحساب عن (ADMIN) ولا يمكن تعطيله أو حذفه للحفاظ على استمرارية إدارة النظام.
+                </p>
+              </div>
             </div>
           )}
 
@@ -494,10 +614,11 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               id="user-full-name"
               type="text"
               required
+              disabled={isSubmitting}
               placeholder="مثال: حسام فاروق"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#0F766E] transition-colors"
+              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#11243A] transition-colors disabled:opacity-50"
             />
           </div>
 
@@ -510,35 +631,109 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               id="user-username"
               type="text"
               required
+              disabled={isSubmitting}
               dir="ltr"
               placeholder="مثال: hossam_sales"
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-left font-mono focus:outline-none focus:border-[#0F766E] transition-colors"
+              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-left font-mono focus:outline-none focus:border-[#11243A] transition-colors disabled:opacity-50"
             />
             <p className="text-[10px] text-slate-400 mt-1">
               اسم الدخول فريد، يُستخدم لتمييز وتوقيع سجلات العمليات في النظام.
             </p>
           </div>
 
-          {/* Email (Administrative Identifier) */}
+          {/* Email */}
           <div>
             <label htmlFor="user-email" className="block text-xs font-bold text-slate-700 mb-1">
-              البريد الإلكتروني (Email) <span className="text-slate-400 font-normal">(اختياري / معرّف حساب رقمي)</span>
+              البريد الإلكتروني (Email) <span className="text-rose-500">*</span>
             </label>
             <input
               id="user-email"
               type="email"
+              required
+              disabled={isSubmitting}
               dir="ltr"
               placeholder="مثال: user@alamira.com"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-left font-mono focus:outline-none focus:border-[#0F766E] transition-colors"
+              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-left font-mono focus:outline-none focus:border-[#11243A] transition-colors disabled:opacity-50"
             />
             <p className="text-[10px] text-slate-400 mt-1">
-              يُستخدم لتوثيق هوية المستخدم وتمهيد ربطه بمصادقة البريد الإلكتروني المشفرة مستقبلاً.
+              معرّف الحساب في نظام المصادقة Supabase.
             </p>
           </div>
+
+          {/* Optional Phone Number */}
+          <div>
+            <label htmlFor="user-phone" className="block text-xs font-bold text-slate-700 mb-1">
+              رقم الهاتف (اختياري)
+            </label>
+            <input
+              id="user-phone"
+              type="tel"
+              disabled={isSubmitting}
+              dir="ltr"
+              placeholder="مثال: 01012345678"
+              value={formData.phone || ''}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-left font-mono focus:outline-none focus:border-[#11243A] transition-colors disabled:opacity-50"
+            />
+          </div>
+
+          {/* Password & Confirm Password (Required when creating a new sales operator) */}
+          {!editingUserId && (
+            <>
+              <div>
+                <label htmlFor="user-password" className="block text-xs font-bold text-slate-700 mb-1">
+                  كلمة المرور الأولية (Initial Password) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    id="user-password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    disabled={isSubmitting}
+                    minLength={8}
+                    dir="ltr"
+                    placeholder="8 أحرف على الأقل تحتوي أحرفاً وأرقاماً..."
+                    value={formData.password || ''}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-left font-mono focus:outline-none focus:border-[#11243A] transition-colors pr-9 disabled:opacity-50"
+                  />
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer disabled:opacity-50"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  يتم اعتماد كلمة المرور هذه وتأكيد الحساب إدارياً في نظام المصادقة Supabase.
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="user-confirm-password" className="block text-xs font-bold text-slate-700 mb-1">
+                  تأكيد كلمة المرور (Confirm Password) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="user-confirm-password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  disabled={isSubmitting}
+                  minLength={8}
+                  dir="ltr"
+                  placeholder="أعد إدخال كلمة المرور للتأكيد..."
+                  value={formData.confirmPassword || ''}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-left font-mono focus:outline-none focus:border-[#11243A] transition-colors disabled:opacity-50"
+                />
+              </div>
+            </>
+          )}
 
           {/* Role */}
           <div>
@@ -547,21 +742,24 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <label
-                className={`p-3 rounded-xl border text-xs cursor-pointer flex flex-col gap-1 transition-all ${
+                className={cn(
+                  'p-3 rounded-xl border text-xs cursor-pointer flex flex-col gap-1 transition-all',
                   formData.role === 'ADMIN'
                     ? 'border-[#11243A] bg-slate-50 ring-1 ring-[#11243A]'
-                    : 'border-slate-200 hover:bg-slate-50'
-                }`}
+                    : 'border-slate-200 hover:bg-slate-50',
+                  (isEditingPrimaryAdmin || !editingUserId) && 'opacity-60 cursor-not-allowed'
+                )}
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-[#11243A] flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-[#0F766E]" />
+                    <ShieldCheck className="w-4 h-4 text-[#11243A]" />
                     مدير النظام (Admin)
                   </span>
                   <input
                     type="radio"
                     name="role"
                     value="ADMIN"
+                    disabled={isEditingPrimaryAdmin || !editingUserId}
                     checked={formData.role === 'ADMIN'}
                     onChange={() => setFormData({ ...formData, role: 'ADMIN' })}
                     className="cursor-pointer"
@@ -573,21 +771,24 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               </label>
 
               <label
-                className={`p-3 rounded-xl border text-xs cursor-pointer flex flex-col gap-1 transition-all ${
+                className={cn(
+                  'p-3 rounded-xl border text-xs cursor-pointer flex flex-col gap-1 transition-all',
                   formData.role === 'SALES_OPERATOR'
-                    ? 'border-[#0F766E] bg-teal-50/50 ring-1 ring-[#0F766E]'
-                    : 'border-slate-200 hover:bg-slate-50'
-                }`}
+                    ? 'border-slate-800 bg-slate-50 ring-1 ring-slate-800'
+                    : 'border-slate-200 hover:bg-slate-50',
+                  isEditingPrimaryAdmin && 'opacity-40 cursor-not-allowed'
+                )}
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-teal-900 flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-teal-600" />
+                  <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-slate-700" />
                     مسؤول مبيعات (Sales)
                   </span>
                   <input
                     type="radio"
                     name="role"
                     value="SALES_OPERATOR"
+                    disabled={isEditingPrimaryAdmin}
                     checked={formData.role === 'SALES_OPERATOR'}
                     onChange={() => setFormData({ ...formData, role: 'SALES_OPERATOR' })}
                     className="cursor-pointer"
@@ -598,6 +799,17 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                 </span>
               </label>
             </div>
+            {isEditingPrimaryAdmin && (
+              <p className="text-[10px] text-amber-700 mt-1 flex items-center gap-1">
+                <Lock className="w-3 h-3 inline" />
+                دور المدير الأساسي محمي ولا يمكن تغييره.
+              </p>
+            )}
+            {!editingUserId && (
+              <p className="text-[10px] text-slate-500 mt-1">
+                يتم إنشاء الحسابات الجديدة وتوثيقها كمسؤولي مبيعات (Sales Operators) لربطها بهوية دخول جديدة.
+              </p>
+            )}
           </div>
 
           {/* Job Title */}
@@ -611,26 +823,38 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               placeholder="مثال: مسؤول مبيعات قطاع الصعيد"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#0F766E] transition-colors"
+              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#11243A] transition-colors"
             />
           </div>
 
           {/* Active Status */}
           <div className="pt-1">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label
+              className={cn(
+                'flex items-center gap-2',
+                isEditingPrimaryAdmin ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
+              )}
+            >
               <input
                 type="checkbox"
+                disabled={isEditingPrimaryAdmin}
                 checked={formData.is_active}
                 onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                className="w-4 h-4 text-[#0F766E] rounded border-slate-300 focus:ring-[#0F766E] cursor-pointer"
+                className="w-4 h-4 text-[#11243A] rounded border-slate-300 focus:ring-[#11243A] cursor-pointer"
               />
               <span className="text-xs font-bold text-slate-700">
                 الحساب نشط وجاهز للتشغيل
               </span>
             </label>
-            <p className="text-[10px] text-slate-500 mr-6">
-              إذا تم إلغاء التفعيل، سيتم حظر المستخدم من تنفيذ أي عمليات بالنظام فوراً.
-            </p>
+            {isEditingPrimaryAdmin ? (
+              <p className="text-[10px] text-amber-700 mr-6">
+                لا يمكن تعطيل حساب المدير الأساسي.
+              </p>
+            ) : (
+              <p className="text-[10px] text-slate-500 mr-6">
+                إذا تم إلغاء التفعيل، سيتم حظر المستخدم من تنفيذ أي عمليات بالنظام فوراً.
+              </p>
+            )}
           </div>
 
           {/* Modal Actions */}
@@ -639,7 +863,10 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setIsModalOpen(false)}
+              onClick={() => {
+                setIsModalOpen(false)
+                setFormData(INITIAL_FORM)
+              }}
               disabled={isSubmitting}
             >
               إلغاء
@@ -649,10 +876,14 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               variant="primary"
               size="sm"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-1"
+              className="inline-flex items-center gap-1 min-w-[95px] justify-center"
             >
-              <UserCheck className="w-3.5 h-3.5" />
-              <span>{editingUserId ? 'حفظ التعديلات' : 'إضافة المستخدم'}</span>
+              {isSubmitting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <UserCheck className="w-3.5 h-3.5" />
+              )}
+              <span>{isSubmitting ? 'جاري المعالجة...' : editingUserId ? 'حفظ التعديلات' : 'إنشاء الحساب'}</span>
             </Button>
           </div>
         </form>

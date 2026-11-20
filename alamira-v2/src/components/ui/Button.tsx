@@ -29,15 +29,15 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      'inline-flex items-center justify-center font-bold rounded-lg transition-all focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none select-none cursor-pointer active:scale-[0.98]'
+      'inline-flex items-center justify-center font-bold rounded-lg transition-all focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[#11243A] focus-visible:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none select-none cursor-pointer active:scale-[0.98]'
 
     const variantStyles = {
       primary:
-        'bg-[#0F766E] text-white hover:bg-[#115E59] active:bg-[#134E4A] shadow-xs',
+        'bg-[#11243A] text-white hover:bg-[#1E3A5F] active:bg-[#0A1624] shadow-xs',
       secondary:
         'bg-[#F8FAFC] text-[#11243A] hover:bg-slate-100 active:bg-slate-200 border border-[#CBD5E1]',
       outline:
-        'border border-[#CBD5E1] bg-white text-[#11243A] hover:bg-[#F8FAFC] hover:border-[#94A3B8] hover:text-[#0F766E] active:bg-slate-100',
+        'border border-[#CBD5E1] bg-white text-[#11243A] hover:bg-[#F8FAFC] hover:border-[#94A3B8] hover:text-[#11243A] active:bg-slate-100',
       ghost:
         'text-slate-600 hover:text-[#11243A] hover:bg-slate-100 active:bg-slate-200',
       danger:

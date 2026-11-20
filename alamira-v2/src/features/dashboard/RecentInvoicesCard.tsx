@@ -38,7 +38,7 @@ export const RecentInvoicesCard: React.FC<RecentInvoicesCardProps> = ({ invoices
       <CardHeader className="flex flex-row items-center justify-between gap-2 p-3.5 sm:p-4 pb-2.5 border-b border-[#E2E8F0]">
         <div className="min-w-0">
           <CardTitle className="flex items-center gap-2 text-sm sm:text-[15px] font-extrabold text-[#11243A]">
-            <FileText className="w-4.5 h-4.5 text-[#0F766E] shrink-0" />
+            <FileText className="w-4.5 h-4.5 text-[#11243A] shrink-0" />
             <span className="truncate">أحدث فواتير المبيعات</span>
           </CardTitle>
           <CardDescription className="text-[11px] text-[#64748B] mt-0.5 truncate">
@@ -47,7 +47,7 @@ export const RecentInvoicesCard: React.FC<RecentInvoicesCardProps> = ({ invoices
         </div>
         <Link
           to="/invoices"
-          className="text-xs font-bold text-[#0F766E] hover:text-[#115E59] flex items-center gap-1 transition-colors shrink-0 hover:underline"
+          className="text-xs font-bold text-[#11243A] hover:text-[#1E3A5F] flex items-center gap-1 transition-colors shrink-0 hover:underline"
         >
           <span>عرض الكل</span>
           <ArrowLeft className="w-3.5 h-3.5" />

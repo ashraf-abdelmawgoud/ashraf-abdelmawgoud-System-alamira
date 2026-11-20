@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { ProductFilters } from './ProductFilters'
 import { ProductsTable } from './ProductsTable'
 import { ProductMobileCard } from './ProductMobileCard'
@@ -17,8 +17,18 @@ export const ProductsView: React.FC = () => {
   const [categories, setCategories] = useState<string[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [searchQuery, setSearchQuery] = useState<string>('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedStatus, setSelectedStatus] = useState<ProductStatus>('all')
+  const activeRequestIdRef = useRef<number>(0)
+
+  // 300ms debounce for remote search queries with pending timer cleanup
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   // Modals state
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -39,25 +49,36 @@ export const ProductsView: React.FC = () => {
   }
 
   const loadData = useCallback(async () => {
+    const requestId = ++activeRequestIdRef.current
     setLoading(true)
     try {
       const [prods, cats] = await Promise.all([
-        dataService.getProducts({
-          search: searchQuery,
-          category: selectedCategory,
-          status: selectedStatus,
-        }, currentUser.role),
+        dataService.getProducts(
+          {
+            search: debouncedSearchQuery,
+            category: selectedCategory,
+            status: selectedStatus,
+          },
+          currentUser.role
+        ),
         dataService.getCategories(),
       ])
+
+      // Prevent race conditions: drop stale responses if a newer search was initiated
+      if (requestId !== activeRequestIdRef.current) return
+
       setProducts(prods)
       setCategories(cats)
     } catch (err: unknown) {
+      if (requestId !== activeRequestIdRef.current) return
       const msg = err instanceof Error ? err.message : 'فشل تحميل بيانات الأصناف'
       showNotification(msg, 'error')
     } finally {
-      setLoading(false)
+      if (requestId === activeRequestIdRef.current) {
+        setLoading(false)
+      }
     }
-  }, [searchQuery, selectedCategory, selectedStatus, currentUser.role])
+  }, [debouncedSearchQuery, selectedCategory, selectedStatus, currentUser.role])
 
   useEffect(() => {
     loadData()
@@ -159,7 +180,7 @@ export const ProductsView: React.FC = () => {
               <button
                 type="button"
                 onClick={handleOpenAddModal}
-                className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-[#0F766E] rounded-lg hover:bg-[#115E59] transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-[#11243A] rounded-lg hover:bg-[#1E3A5F] transition-colors cursor-pointer"
               >
                 <span>إضافة صنف الآن</span>
               </button>

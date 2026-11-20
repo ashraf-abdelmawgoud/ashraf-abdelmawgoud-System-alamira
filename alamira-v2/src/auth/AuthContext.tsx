@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { User, Role } from '@/types'
 import {
   MOCK_USERS,
@@ -16,6 +16,7 @@ import {
 } from './rbac'
 import { mockDataService, INITIAL_MOCK_USERS } from '@/services/mockDataService'
 import { isMockMode, getSupabaseClient, isSupabaseConfigured } from '@/services/supabaseClient'
+import { cacheService } from '@/services/cacheService'
 
 export interface AuthContextValue {
   currentUser: User
@@ -90,6 +91,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(!isMock)
   const [authError, setAuthError] = useState<string | null>(null)
 
+  const isBootstrappedRef = useRef(false)
+  const isRefreshingRef = useRef(false)
+  const currentUserRef = useRef<User>(currentUser)
+  currentUserRef.current = currentUser
+
   const clearAuthError = useCallback(() => {
     setAuthError(null)
   }, [])
@@ -97,95 +103,137 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   // -------------------------------------------------------------------------
   // REAL SUPABASE AUTHENTICATION INITIALIZATION & SESSION RESTORATION
   // -------------------------------------------------------------------------
-  const initRealSession = useCallback(async () => {
-    if (isMock || !isSupabaseConfigured()) {
-      setIsAuthenticated(true)
-      setIsLoadingAuth(false)
-      return
-    }
+  const syncRealSession = useCallback(
+    async (options: { isInitialBoot?: boolean } = {}) => {
+      const { isInitialBoot = false } = options
 
-    try {
-      setIsLoadingAuth(true)
-      const supabase = getSupabaseClient()
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-
-      if (sessionError) {
-        throw sessionError
-      }
-
-      if (!session?.user) {
-        setIsAuthenticated(false)
+      if (isMock || !isSupabaseConfigured()) {
+        setIsAuthenticated(true)
         setIsLoadingAuth(false)
+        isBootstrappedRef.current = true
         return
       }
 
-      // Verify membership in server-controlled authorized_users allowlist
-      const { data: authRecord, error: authErr } = await supabase
-        .from('authorized_users')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single()
+      // Avoid simultaneous duplicate session sync calls
+      if (isRefreshingRef.current) return
+      isRefreshingRef.current = true
 
-      if (authErr || !authRecord) {
-        await supabase.auth.signOut()
-        setAuthError('تم التحقق من بيانات الدخول، ولكن هذا الحساب غير مصرح له بالدخول للمنظومة.')
-        setIsAuthenticated(false)
+      // Show full-screen loader ONLY during initial boot or when no session has been bootstrapped yet
+      if (isInitialBoot || !isBootstrappedRef.current) {
+        setIsLoadingAuth(true)
+      }
+
+      try {
+        const supabase = getSupabaseClient()
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession()
+
+        if (sessionError) {
+          throw sessionError
+        }
+
+        if (!session?.user) {
+          setIsAuthenticated(false)
+          if (isInitialBoot || !isBootstrappedRef.current) {
+            setIsLoadingAuth(false)
+          }
+          isBootstrappedRef.current = true
+          return
+        }
+
+        // Verify membership in server-controlled authorized_users allowlist
+        const { data: authRecord, error: authErr } = await supabase
+          .from('authorized_users')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .single()
+
+        if (authErr || !authRecord) {
+          await supabase.auth.signOut()
+          setAuthError('تم التحقق من بيانات الدخول، ولكن هذا الحساب غير مصرح له بالدخول للمنظومة.')
+          setIsAuthenticated(false)
+          setCurrentUser(MOCK_USERS.ADMIN)
+          return
+        }
+
+        if (authRecord.is_active === false) {
+          await supabase.auth.signOut()
+          setAuthError('عفواً، تم تعطيل هذا الحساب. يرجى التواصل مع إدارة النظام.')
+          setIsAuthenticated(false)
+          setCurrentUser(MOCK_USERS.ADMIN)
+          return
+        }
+
+        // Valid session & authorized user
+        const mappedUser: User = {
+          id: authRecord.user_id,
+          name: authRecord.full_name || session.user.email?.split('@')[0] || 'مستخدم',
+          username: authRecord.username || authRecord.email?.split('@')[0] || 'user',
+          email: authRecord.email || session.user.email || '',
+          role: (authRecord.role as Role) || 'ADMIN',
+          title: authRecord.role === 'SALES_OPERATOR' ? 'مسؤول مبيعات' : 'مدير النظام',
+          is_active: authRecord.is_active !== false,
+        }
+
+        // Only update state if identity or role has actually changed to prevent cascading re-renders
+        const prev = currentUserRef.current
+        if (
+          prev.id !== mappedUser.id ||
+          prev.role !== mappedUser.role ||
+          prev.name !== mappedUser.name ||
+          prev.is_active !== mappedUser.is_active
+        ) {
+          setCurrentUser(mappedUser)
+        }
+        setIsAuthenticated(true)
+        setAuthError(null)
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'حدث خطأ أثناء استعادة جلسة المستخدم'
+        // If we have not bootstrapped yet, report error and mark unauthenticated
+        if (!isBootstrappedRef.current) {
+          setAuthError(msg)
+          setIsAuthenticated(false)
+        } else {
+          // In an active session, log warning for transient network failures without unmounting app
+          console.warn('Silent token/session refresh failed:', msg)
+        }
+      } finally {
+        isRefreshingRef.current = false
+        isBootstrappedRef.current = true
         setIsLoadingAuth(false)
-        return
       }
-
-      if (authRecord.is_active === false) {
-        await supabase.auth.signOut()
-        setAuthError('عفواً، تم تعطيل هذا الحساب. يرجى التواصل مع إدارة النظام.')
-        setIsAuthenticated(false)
-        setIsLoadingAuth(false)
-        return
-      }
-
-      // Valid session & authorized user
-      const mappedUser: User = {
-        id: authRecord.user_id,
-        name: authRecord.full_name || session.user.email?.split('@')[0] || 'مستخدم',
-        username: authRecord.username || authRecord.email?.split('@')[0] || 'user',
-        email: authRecord.email || session.user.email || '',
-        role: (authRecord.role as Role) || 'ADMIN',
-        title: authRecord.role === 'SALES_OPERATOR' ? 'مسؤول مبيعات' : 'مدير النظام',
-        is_active: authRecord.is_active !== false,
-      }
-
-      setCurrentUser(mappedUser)
-      setIsAuthenticated(true)
-      setAuthError(null)
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'حدث خطأ أثناء استعادة جلسة المستخدم'
-      setAuthError(msg)
-      setIsAuthenticated(false)
-    } finally {
-      setIsLoadingAuth(false)
-    }
-  }, [isMock])
+    },
+    [isMock]
+  )
 
   useEffect(() => {
-    initRealSession()
+    // 1. Initial boot: checks session with full-screen loader
+    syncRealSession({ isInitialBoot: true })
 
     if (!isMock && isSupabaseConfigured()) {
       const supabase = getSupabaseClient()
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          if (event === 'SIGNED_OUT' || !session) {
-            setIsAuthenticated(false)
-            setCurrentUser(MOCK_USERS.ADMIN)
-          } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            initRealSession()
-          }
+      const authResponse = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_OUT' || !session) {
+          cacheService.clear()
+          setIsAuthenticated(false)
+          setCurrentUser(MOCK_USERS.ADMIN)
+          setIsLoadingAuth(false)
+        } else if (event === 'SIGNED_IN') {
+          // If a genuine sign-in event occurred, bootstrap if needed or sync profile in background
+          syncRealSession({ isInitialBoot: !isBootstrappedRef.current })
+        } else if (event === 'TOKEN_REFRESHED') {
+          // Token refreshed: ALWAYS in background without unmounting the application!
+          syncRealSession({ isInitialBoot: false })
         }
-      )
+      })
 
       return () => {
-        subscription.unsubscribe()
+        authResponse?.data?.subscription?.unsubscribe?.()
       }
     }
-  }, [initRealSession, isMock])
+  }, [syncRealSession, isMock])
 
   // -------------------------------------------------------------------------
   // REAL SUPABASE LOGIN
@@ -281,6 +329,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   // REAL SUPABASE LOGOUT
   // -------------------------------------------------------------------------
   const logout = useCallback(async () => {
+    cacheService.clear()
     if (!isMock && isSupabaseConfigured()) {
       try {
         const supabase = getSupabaseClient()
@@ -314,6 +363,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   const switchUser = useCallback(
     (user: User) => {
       if (!isMock) return
+      cacheService.clear()
       mockDataService.logAuthSwitchUser(user, currentUser)
       setCurrentUser(user)
     },
@@ -323,6 +373,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   const switchRole = useCallback(
     (role: Role) => {
       if (!isMock) return
+      cacheService.clear()
       mockDataService.logAuthSwitchRole(role, currentUser)
       const candidate = users.find((u) => u.role === role && u.is_active) || MOCK_USERS[role]
       setCurrentUser(candidate)
@@ -332,6 +383,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
   const toggleRole = useCallback(() => {
     if (!isMock) return
+    cacheService.clear()
     const nextRole: Role = currentUser.role === 'ADMIN' ? 'SALES_OPERATOR' : 'ADMIN'
     const candidate = users.find((u) => u.role === nextRole && u.is_active) || MOCK_USERS[nextRole]
     setCurrentUser(candidate)

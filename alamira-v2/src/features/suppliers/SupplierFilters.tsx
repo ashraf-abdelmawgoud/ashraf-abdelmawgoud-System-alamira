@@ -79,7 +79,7 @@ export const SupplierFilters: React.FC<SupplierFiltersProps> = ({
                 onSearchChange('')
                 onStatusChange('all')
               }}
-              className="text-[#0F766E] hover:text-[#115E59] font-bold transition-colors cursor-pointer"
+              className="text-[#11243A] hover:text-[#1E3A5F] font-bold transition-colors cursor-pointer"
             >
               <span>إعادة ضبط</span>
             </button>

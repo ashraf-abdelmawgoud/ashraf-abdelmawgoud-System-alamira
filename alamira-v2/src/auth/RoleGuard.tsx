@@ -78,7 +78,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
           <div className="pt-2">
             <Link
               to="/"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-white bg-[#0F766E] rounded-lg hover:bg-[#115E59] transition-colors"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-white bg-[#11243A] rounded-lg hover:bg-[#1E3A5F] transition-colors"
             >
               <ArrowRight className="w-4 h-4" />
               <span>العودة إلى لوحة التحكم</span>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { CustomerFilters } from './CustomerFilters'
 import { CustomersTable } from './CustomersTable'
 import { CustomerMobileCard } from './CustomerMobileCard'
@@ -15,7 +15,17 @@ export const CustomersView: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [searchQuery, setSearchQuery] = useState<string>('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('')
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'active' | 'inactive'>('all')
+  const activeRequestIdRef = useRef<number>(0)
+
+  // 300ms debounce for remote search queries with pending timer cleanup
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   // Modals
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -36,20 +46,28 @@ export const CustomersView: React.FC = () => {
   }
 
   const loadData = useCallback(async () => {
+    const requestId = ++activeRequestIdRef.current
     setLoading(true)
     try {
       const data = await dataService.getCustomers({
-        search: searchQuery,
+        search: debouncedSearchQuery,
         status: selectedStatus,
       })
+
+      // Prevent race conditions: drop stale responses
+      if (requestId !== activeRequestIdRef.current) return
+
       setCustomers(data)
     } catch (err: unknown) {
+      if (requestId !== activeRequestIdRef.current) return
       const msg = err instanceof Error ? err.message : 'فشل تحميل دليل العملاء'
       showNotification(msg, 'error')
     } finally {
-      setLoading(false)
+      if (requestId === activeRequestIdRef.current) {
+        setLoading(false)
+      }
     }
-  }, [searchQuery, selectedStatus])
+  }, [debouncedSearchQuery, selectedStatus])
 
   useEffect(() => {
     loadData()
@@ -146,7 +164,7 @@ export const CustomersView: React.FC = () => {
             <button
               type="button"
               onClick={handleOpenAddModal}
-              className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-[#0F766E] rounded-lg hover:bg-[#115E59] transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-[#11243A] rounded-lg hover:bg-[#1E3A5F] transition-colors cursor-pointer"
             >
               <span>إضافة عميل جديد</span>
             </button>

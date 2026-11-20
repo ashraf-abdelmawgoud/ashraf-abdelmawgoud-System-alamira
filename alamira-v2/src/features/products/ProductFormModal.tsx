@@ -27,7 +27,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [formData, setFormData] = useState<ProductFormData>({
     sku: '',
     name: '',
-    category: categories[0] || 'توريدات كهربائية',
+    category: categories[0] || 'عام',
     unit: 'قطعة',
     allows_decimal_quantity: false,
     purchase_price: 0,
@@ -46,7 +46,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setFormData({
         sku: product.sku || product.code || '',
         name: product.name || '',
-        category: product.category || categories[0] || 'توريدات كهربائية',
+        category: product.category || categories[0] || 'عام',
         unit: product.unit || 'قطعة',
         allows_decimal_quantity: Boolean(product.allows_decimal_quantity),
         purchase_price: product.purchase_price ?? product.costPrice ?? 0,
@@ -60,7 +60,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setFormData({
         sku: '',
         name: '',
-        category: categories[0] || 'توريدات كهربائية',
+        category: categories[0] || 'عام',
         unit: 'قطعة',
         allows_decimal_quantity: false,
         purchase_price: 0,

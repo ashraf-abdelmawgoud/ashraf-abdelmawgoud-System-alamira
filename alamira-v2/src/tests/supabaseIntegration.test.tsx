@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { isMockMode, isSupabaseConfigured, getSupabaseClient } from '@/services/supabaseClient'
 import { supabaseDataService } from '@/services/supabaseDataService'
 import { dataService } from '@/services/dataService'
+import { cacheService } from '@/services/cacheService'
 import { User, Role } from '@/types'
 
 // Mock Supabase client module
@@ -15,8 +16,10 @@ vi.mock('@/services/supabaseClient', async () => {
     update: vi.fn().mockReturnThis(),
     delete: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    in: vi.fn().mockReturnThis(),
     order: vi.fn().mockResolvedValue({ data: [], error: null }),
     single: vi.fn().mockResolvedValue({ data: null, error: null }),
+    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
   })
 
   const mockClient = {
@@ -28,12 +31,20 @@ vi.mock('@/services/supabaseClient', async () => {
     },
     from: vi.fn(() => createMockQueryBuilder()),
     rpc: vi.fn(),
+    functions: {
+      invoke: vi.fn(),
+    },
   }
 
   return {
     ...actual,
     getSupabaseClient: vi.fn(() => mockClient),
   }
+})
+
+beforeEach(() => {
+  cacheService.clear()
+  vi.clearAllMocks()
 })
 
 describe('Supabase Client Configuration & Gateway', () => {
@@ -96,9 +107,9 @@ describe('Phase D: Product Creation with Initial Stock & RBAC Masking', () => {
 
     const newProduct = await supabaseDataService.createProduct(
       {
-        sku: 'CAKE-01',
-        name: 'تورته شوكولاتة فاخرة',
-        category: 'حلويات غربية',
+        sku: 'ELC-01',
+        name: 'قاطع أوتوماتيكي ثلاثي 63 أمبير',
+        category: 'توريدات كهربائية',
         unit: 'قطعة',
         allows_decimal_quantity: false,
         purchase_price: 120,
@@ -110,8 +121,8 @@ describe('Phase D: Product Creation with Initial Stock & RBAC Masking', () => {
     )
 
     expect(mockClient.rpc).toHaveBeenCalledWith('register_product_with_opening_stock', {
-      p_sku: 'CAKE-01',
-      p_name: 'تورته شوكولاتة فاخرة',
+      p_sku: 'ELC-01',
+      p_name: 'قاطع أوتوماتيكي ثلاثي 63 أمبير',
       p_unit: 'قطعة',
       p_opening_quantity: 50,
       p_allows_decimal_quantity: false,
@@ -121,7 +132,7 @@ describe('Phase D: Product Creation with Initial Stock & RBAC Masking', () => {
       p_min_stock_level: 5,
       p_description: null,
     })
-    expect(newProduct.name).toBe('تورته شوكولاتة فاخرة')
+    expect(newProduct.name).toBe('قاطع أوتوماتيكي ثلاثي 63 أمبير')
     expect(newProduct.current_stock).toBe(50)
   })
 
@@ -134,11 +145,11 @@ describe('Phase D: Product Creation with Initial Stock & RBAC Masking', () => {
 
     const newProduct = await supabaseDataService.createProduct(
       {
-        sku: 'SWEET-02',
-        name: 'بسبوسة بالقشطة',
-        category: 'حلويات شرقية',
-        unit: 'كيلو',
-        allows_decimal_quantity: true,
+        sku: 'PLM-02',
+        name: 'محبس كروي إيطالي 1 بوصة',
+        category: 'سباكة وتوريدات صحية',
+        unit: 'قطعة',
+        allows_decimal_quantity: false,
         purchase_price: 80,
         selling_price: 140,
         min_stock_level: 5,
@@ -555,5 +566,191 @@ describe('Phase G: Immutable Audit Logging', () => {
     await expect(supabaseDataService.deleteDraftInvoice('inv-1', mockSalesUser)).rejects.toThrow(
       'غير مصرح: يمكن لمسؤول المبيعات حذف مسودات الفواتير التي أنشأها بنفسه فقط'
     )
+  })
+
+  describe('Phase E: Real Sales Operator Provisioning via Edge Function', () => {
+    const adminUser: User = {
+      id: '040bda71-7ffa-4a17-94d8-ff9cd72aed5d',
+      name: 'أشرف عبد الموجود',
+      username: 'ashraf_admin',
+      email: 'ashraf@alamira.com',
+      role: 'ADMIN',
+      title: 'المدير العام',
+      is_active: true,
+    }
+
+    const salesUser: User = {
+      id: 'usr-sales-10',
+      name: 'علي حسن',
+      username: 'ali_sales',
+      email: 'ali@alamira.com',
+      role: 'SALES_OPERATOR',
+      title: 'مسؤول مبيعات',
+      is_active: true,
+    }
+
+    it('rejects creation when caller has SALES_OPERATOR role (unauthorized)', async () => {
+      await expect(
+        supabaseDataService.createSalesOperator(
+          {
+            full_name: 'كريم محمود',
+            email: 'karim@alamira.com',
+          },
+          salesUser
+        )
+      ).rejects.toThrow('غير مصرح: إضافة مسؤولي المبيعات مقتصرة على مدير النظام فقط')
+    })
+
+    it('validates required name and email before invoking Edge Function', async () => {
+      await expect(
+        supabaseDataService.createSalesOperator(
+          {
+            full_name: '',
+            email: 'karim@alamira.com',
+          },
+          adminUser
+        )
+      ).rejects.toThrow('الاسم والبريد الإلكتروني مطلوبان لإنشاء حساب مسؤول المبيعات')
+
+      await expect(
+        supabaseDataService.createSalesOperator(
+          {
+            full_name: 'كريم محمود',
+            email: '',
+          },
+          adminUser
+        )
+      ).rejects.toThrow('الاسم والبريد الإلكتروني مطلوبان لإنشاء حساب مسؤول المبيعات')
+    })
+
+    it('handles Edge Function 409 conflict and extracts safe Arabic error message from context', async () => {
+      const mockClient = getSupabaseClient() as any
+      const mockError = {
+        message: 'Edge Function returned a non-2xx status code',
+        context: {
+          json: vi.fn().mockResolvedValue({
+            error: 'البريد الإلكتروني "karim@alamira.com" مسجل بالفعل لمستخدم مصرح له في النظام',
+          }),
+        },
+      }
+
+      mockClient.functions.invoke.mockResolvedValueOnce({
+        data: null,
+        error: mockError,
+      })
+
+      await expect(
+        supabaseDataService.createSalesOperator(
+          {
+            full_name: 'كريم محمود',
+            email: 'karim@alamira.com',
+            password: 'StrongPassword123!',
+          },
+          adminUser
+        )
+      ).rejects.toThrow('البريد الإلكتروني "karim@alamira.com" مسجل بالفعل لمستخدم مصرح له في النظام')
+    })
+
+    it('handles Edge Function unexpected failure safely without leaking internals', async () => {
+      const mockClient = getSupabaseClient() as any
+      mockClient.functions.invoke.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Network or server error' },
+      })
+
+      await expect(
+        supabaseDataService.createSalesOperator(
+          {
+            full_name: 'كريم محمود',
+            email: 'karim@alamira.com',
+            password: 'StrongPassword123!',
+          },
+          adminUser
+        )
+      ).rejects.toThrow('Network or server error')
+    })
+
+    it('successfully provisions sales operator, clears cache namespace, and logs audit', async () => {
+      const mockClient = getSupabaseClient() as any
+      mockClient.functions.invoke.mockResolvedValueOnce({
+        data: {
+          success: true,
+          user: {
+            id: 'new-operator-uuid-123',
+            email: 'karim@alamira.com',
+            name: 'كريم محمود',
+            username: 'karim_sales',
+            role: 'SALES_OPERATOR',
+            title: 'مسؤول مبيعات',
+            is_active: true,
+          },
+        },
+        error: null,
+      })
+
+      const cacheSpy = vi.spyOn(cacheService, 'invalidateNamespace')
+      const auditSpy = vi.spyOn(supabaseDataService, 'recordAuditLog').mockResolvedValueOnce({} as any)
+
+      const result = await supabaseDataService.createSalesOperator(
+        {
+          full_name: 'كريم محمود',
+          email: 'karim@alamira.com',
+          password: 'StrongPassword123!',
+          username: 'karim_sales',
+        },
+        adminUser
+      )
+
+      expect(mockClient.functions.invoke).toHaveBeenCalledWith('create-sales-operator', {
+        body: {
+          email: 'karim@alamira.com',
+          password: 'StrongPassword123!',
+          full_name: 'كريم محمود',
+          username: 'karim_sales',
+          phone: null,
+        },
+      })
+
+      expect(result.id).toBe('new-operator-uuid-123')
+      expect(result.name).toBe('كريم محمود')
+      expect(result.role).toBe('SALES_OPERATOR')
+      expect(result.is_active).toBe(true)
+      expect(cacheSpy).toHaveBeenCalledWith('users')
+      expect(auditSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'USER_CREATE',
+          entity_type: 'user',
+          entity_id: 'new-operator-uuid-123',
+          performed_by_id: adminUser.id,
+          outcome: 'success',
+        })
+      )
+    })
+
+    it('requires a password of at least 8 characters when creating a sales operator', async () => {
+      await expect(
+        supabaseDataService.createSalesOperator(
+          {
+            full_name: 'ياسر خليل',
+            email: 'yasser@alamira.com',
+            username: 'yasser_sales',
+            password: '',
+          },
+          adminUser
+        )
+      ).rejects.toThrow('كلمة المرور مطلوبة ويجب أن تتكون من 8 أحرف على الأقل')
+
+      await expect(
+        supabaseDataService.createSalesOperator(
+          {
+            full_name: 'ياسر خليل',
+            email: 'yasser@alamira.com',
+            username: 'yasser_sales',
+            password: 'short',
+          },
+          adminUser
+        )
+      ).rejects.toThrow('كلمة المرور مطلوبة ويجب أن تتكون من 8 أحرف على الأقل')
+    })
   })
 })

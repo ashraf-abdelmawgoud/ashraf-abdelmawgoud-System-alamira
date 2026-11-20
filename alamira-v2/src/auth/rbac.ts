@@ -43,6 +43,13 @@ export type Permission =
   | 'audit:view'
   | 'audit:export'
 
+export const PRIMARY_ADMIN_ID = '040bda71-7ffa-4a17-94d8-ff9cd72aed5d'
+
+export function isPrimaryAdmin(userId?: string | null): boolean {
+  if (!userId) return false
+  return userId.trim().toLowerCase() === PRIMARY_ADMIN_ID.toLowerCase()
+}
+
 /**
  * Centralized Role-to-Permissions Mapping
  */

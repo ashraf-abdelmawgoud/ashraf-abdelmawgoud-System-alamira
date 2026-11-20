@@ -40,7 +40,7 @@ import {
 } from '@/types'
 import { calculateInvoiceTotals } from '@/domain/invoiceCalculations'
 import { auditLogger } from './auditLogger'
-import { isInvoiceOwner, isCustomerOwner, hasPermission } from '@/auth/rbac'
+import { isInvoiceOwner, isCustomerOwner, hasPermission, isPrimaryAdmin } from '@/auth/rbac'
 
 /**
  * Initial mock users for RBAC management and testing
@@ -2100,6 +2100,35 @@ export const mockDataService = {
     return JSON.parse(JSON.stringify(newUser))
   },
 
+  async createSalesOperator(
+    data: { email: string; password?: string; full_name: string; username?: string; phone?: string },
+    actor?: User | { name?: string; role?: Role; id?: string; is_active?: boolean }
+  ): Promise<User> {
+    const cleanEmail = (data.email || '').trim().toLowerCase()
+    const cleanName = (data.full_name || '').trim()
+    const cleanPassword = (data.password || '').trim()
+
+    if (!cleanEmail || !cleanName) {
+      throw new Error('الاسم والبريد الإلكتروني مطلوبان لإنشاء حساب مسؤول المبيعات')
+    }
+
+    if (!cleanPassword || cleanPassword.length < 8) {
+      throw new Error('كلمة المرور مطلوبة ويجب أن تتكون من 8 أحرف على الأقل')
+    }
+
+    return this.createUser(
+      {
+        name: cleanName,
+        username: data.username?.trim().toLowerCase() || cleanEmail.split('@')[0],
+        email: cleanEmail,
+        role: 'SALES_OPERATOR',
+        title: 'مسؤول مبيعات',
+        is_active: true,
+      },
+      actor
+    )
+  },
+
   async updateUser(
     id: string,
     data: Partial<Omit<User, 'id'>>,
@@ -2109,6 +2138,15 @@ export const mockDataService = {
     assertActiveUser(actor)
     if (actor && actor.role !== 'ADMIN') {
       throw new Error('غير مصرح: تعديل بيانات المستخدمين متاح لمدير النظام فقط')
+    }
+
+    if (isPrimaryAdmin(id)) {
+      if (data.is_active === false) {
+        throw new Error('لا يمكن تعطيل أو حذف حساب المدير الأساسي.')
+      }
+      if (data.role && data.role !== 'ADMIN') {
+        throw new Error('لا يمكن تغيير دور أو خفض صلاحيات حساب المدير الأساسي.')
+      }
     }
 
     const idx = usersStore.findIndex((u) => u.id === id)
@@ -2164,6 +2202,10 @@ export const mockDataService = {
     assertActiveUser(actor)
     if (actor && actor.role !== 'ADMIN') {
       throw new Error('غير مصرح: تغيير حالة المستخدمين متاح لمدير النظام فقط')
+    }
+
+    if (isPrimaryAdmin(id)) {
+      throw new Error('لا يمكن تعطيل أو حذف حساب المدير الأساسي.')
     }
 
     const idx = usersStore.findIndex((u) => u.id === id)
@@ -2323,9 +2365,15 @@ export const mockDataService = {
     return filters ? auditLogger.getFiltered(filters) : auditLogger.getAll()
   },
 
-  async getDashboardSummary(): Promise<DashboardSummary> {
+  async getDashboardSummary(options?: {
+    invoices?: SalesInvoice[]
+    products?: Product[]
+    currentUserRole?: string
+  }): Promise<DashboardSummary> {
     await delay()
-    const approvedInvoices = invoicesStore.filter((i) => i.status === 'approved')
+    const allInvoices = options?.invoices ?? invoicesStore
+    const allProducts = options?.products ?? productsStore
+    const approvedInvoices = allInvoices.filter((i) => i.status === 'approved')
     const totalSales = approvedInvoices.reduce((sum, inv) => sum + Number(inv.final_total || 0), 0)
     const today = new Date().toISOString().slice(0, 10)
     const todayInvoices = approvedInvoices.filter(
@@ -2334,13 +2382,13 @@ export const mockDataService = {
     const todaySales = todayInvoices.reduce((sum, inv) => sum + Number(inv.final_total || 0), 0)
 
     const activeCustomersCount = customersStore.filter((c) => c.is_active).length
-    const lowStockProductsCount = productsStore.filter(
+    const lowStockProductsCount = allProducts.filter(
       (p) =>
         Number(p.current_stock || 0) > 0 &&
         Number(p.current_stock || 0) <= Number(p.min_stock_level || 5)
     ).length
 
-    const recentInvoices: Invoice[] = invoicesStore.slice(0, 5).map((inv) => ({
+    const recentInvoices: Invoice[] = allInvoices.slice(0, 5).map((inv) => ({
       id: inv.id,
       invoiceNumber: inv.invoice_number,
       date: inv.invoice_date,

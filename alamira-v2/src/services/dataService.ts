@@ -320,11 +320,15 @@ export const dataService = {
   // =========================================================================
   // DASHBOARD SUMMARY
   // =========================================================================
-  async getDashboardSummary(): Promise<DashboardSummary> {
+  async getDashboardSummary(options?: {
+    invoices?: SalesInvoice[]
+    products?: Product[]
+    currentUserRole?: string
+  }): Promise<DashboardSummary> {
     if (this.isMock()) {
-      return mockDataService.getDashboardSummary()
+      return mockDataService.getDashboardSummary(options)
     }
-    return supabaseDataService.getDashboardSummary()
+    return supabaseDataService.getDashboardSummary(options)
   },
 
   // =========================================================================
@@ -428,6 +432,16 @@ export const dataService = {
       return mockDataService.toggleUserActive(userId, actor)
     }
     return supabaseDataService.toggleUserActive(userId, actor)
+  },
+
+  async createSalesOperator(
+    data: { email: string; password?: string; full_name: string; username?: string; phone?: string },
+    actor: User
+  ): Promise<User> {
+    if (this.isMock()) {
+      return mockDataService.createSalesOperator(data, actor)
+    }
+    return supabaseDataService.createSalesOperator(data, actor)
   },
 
   async createUser(

@@ -177,7 +177,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
             type="button"
             variant="primary"
             onClick={handleOpenNewBuilder}
-            className="bg-[#0F766E] hover:bg-[#115E59] text-xs shadow-xs flex-1 sm:flex-none justify-center"
+            className="text-xs shadow-xs flex-1 sm:flex-none justify-center"
           >
             فاتورة مبيعات جديدة
           </Button>

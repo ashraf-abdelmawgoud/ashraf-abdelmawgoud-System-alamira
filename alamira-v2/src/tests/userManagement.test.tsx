@@ -61,7 +61,7 @@ describe('Al-Amira ERP V2 — Phase 1 RBAC & User Management', () => {
   })
 
   describe('1. User Management Screen & Tab Integration', () => {
-    it('renders User Management tab in SettingsView and displays development disclaimer banner', async () => {
+    it('renders User Management tab in SettingsView without development simulation banner', async () => {
       render(
         <AuthProvider initialUser={adminUser}>
           <SettingsView defaultTab="users" />
@@ -70,13 +70,13 @@ describe('Al-Amira ERP V2 — Phase 1 RBAC & User Management', () => {
 
       // Tab button is visible
       expect(
-        screen.getByRole('button', { name: /إدارة المستخدمين والصلاحيات \(محاكاة\)/i })
+        screen.getByRole('button', { name: /إدارة المستخدمين والصلاحيات/i })
       ).toBeInTheDocument()
 
-      // Simulation disclaimer banner is visible
+      // Simulation disclaimer banner is NOT in the production UI
       expect(
-        screen.getByText(/محاكاة تشغيلية لإدارة المستخدمين والأدوار \(Development Simulation Only\)/i)
-      ).toBeInTheDocument()
+        screen.queryByText(/محاكاة تشغيلية لإدارة المستخدمين والأدوار/i)
+      ).not.toBeInTheDocument()
 
       // Current mock user card is rendered
       expect(screen.getAllByText('المدير العام').length).toBeGreaterThanOrEqual(1)
@@ -136,13 +136,16 @@ describe('Al-Amira ERP V2 — Phase 1 RBAC & User Management', () => {
       })
 
       // Open Add Modal
-      await user.click(screen.getByRole('button', { name: /إضافة مستخدم تجريبي/i }))
-      expect(screen.getByText('إضافة مستخدم تجريبي جديد')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /إضافة مسؤول مبيعات/i }))
+      expect(screen.getByText('إضافة مسؤول مبيعات جديد')).toBeInTheDocument()
 
       // Fill Form with duplicate username 'admin'
       await user.type(screen.getByLabelText(/اسم المستخدم بالكامل/i), 'طارق العبد')
       await user.type(screen.getByLabelText(/اسم الدخول \(Username\)/i), 'admin')
-      await user.click(screen.getByRole('button', { name: 'إضافة المستخدم' }))
+      await user.type(screen.getByLabelText(/البريد الإلكتروني/i), 'tarek@alamira.com')
+      await user.type(screen.getByLabelText(/كلمة المرور الأولية/i), 'Password123!')
+      await user.type(screen.getByLabelText(/تأكيد كلمة المرور/i), 'Password123!')
+      await user.click(screen.getByRole('button', { name: 'إنشاء الحساب' }))
 
       // Should show duplicate error
       await waitFor(() => {
@@ -153,7 +156,7 @@ describe('Al-Amira ERP V2 — Phase 1 RBAC & User Management', () => {
       const usernameInput = screen.getByLabelText(/اسم الدخول \(Username\)/i)
       await user.clear(usernameInput)
       await user.type(usernameInput, 'tarek_sales')
-      await user.click(screen.getByRole('button', { name: 'إضافة المستخدم' }))
+      await user.click(screen.getByRole('button', { name: 'إنشاء الحساب' }))
 
       // User is created and rendered
       await waitFor(() => {
@@ -164,6 +167,48 @@ describe('Al-Amira ERP V2 — Phase 1 RBAC & User Management', () => {
       const logs = auditLogger.getByAction('USER_CREATE')
       expect(logs.length).toBe(1)
       expect(logs[0].entity_name_or_number).toBe('طارق العبد')
+    })
+
+    it('validates matching passwords and strong password policy when adding user', async () => {
+      const user = userEvent.setup()
+      render(
+        <AuthProvider initialUser={adminUser}>
+          <UserManagementSection />
+        </AuthProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('أحمد محمود')).toBeInTheDocument()
+      })
+
+      // Open Add Modal
+      await user.click(screen.getByRole('button', { name: /إضافة مسؤول مبيعات/i }))
+
+      await user.type(screen.getByLabelText(/اسم المستخدم بالكامل/i), 'سامي فؤاد')
+      await user.type(screen.getByLabelText(/اسم الدخول \(Username\)/i), 'sami_sales')
+      await user.type(screen.getByLabelText(/البريد الإلكتروني/i), 'sami@alamira.com')
+      await user.type(screen.getByLabelText(/كلمة المرور الأولية/i), 'Password123!')
+      await user.type(screen.getByLabelText(/تأكيد كلمة المرور/i), 'DifferentPassword456!')
+      await user.click(screen.getByRole('button', { name: 'إنشاء الحساب' }))
+
+      // Should show mismatched passwords error
+      await waitFor(() => {
+        expect(screen.getByText('كلمتا المرور غير متطابقتين، يرجى إعادة التأكيد بدقة')).toBeInTheDocument()
+      })
+
+      // Fix confirm password to match weak password
+      const pwdInput = screen.getByLabelText(/كلمة المرور الأولية/i)
+      const confirmInput = screen.getByLabelText(/تأكيد كلمة المرور/i)
+      await user.clear(pwdInput)
+      await user.clear(confirmInput)
+      await user.type(pwdInput, 'abcdefgh')
+      await user.type(confirmInput, 'abcdefgh')
+      await user.click(screen.getByRole('button', { name: 'إنشاء الحساب' }))
+
+      // Should show strong password policy error
+      await waitFor(() => {
+        expect(screen.getByText('يجب أن تحتوي كلمة المرور على أحرف وأرقام أو رموز لضمان أمان الحساب')).toBeInTheDocument()
+      })
     })
 
     it('edits an existing mock user information and role', async () => {
@@ -182,7 +227,7 @@ describe('Al-Amira ERP V2 — Phase 1 RBAC & User Management', () => {
       const editButtons = screen.getAllByTitle('تعديل بيانات المستخدم والدور')
       await user.click(editButtons[2]) // Ahmed Mahmoud is 3rd user
 
-      expect(screen.getByText('تعديل بيانات المستخدم التجريبي')).toBeInTheDocument()
+      expect(screen.getByText('تعديل بيانات المستخدم')).toBeInTheDocument()
 
       const titleInput = screen.getByLabelText(/المسمى الوظيفي/i)
       await user.clear(titleInput)

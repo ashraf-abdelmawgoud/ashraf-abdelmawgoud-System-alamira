@@ -31,7 +31,7 @@ export const AppLayout: React.FC = () => {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-[#F5F7FA] font-cairo" dir="rtl">
         <div className="flex flex-col items-center gap-3 text-slate-700">
-          <Loader2 className="w-8 h-8 text-[#0F766E] animate-spin" />
+          <Loader2 className="w-8 h-8 text-[#11243A] animate-spin" />
           <p className="text-sm font-bold">جارٍ التحقق من جلسة المستخدم وقاعدة البيانات...</p>
         </div>
       </div>
@@ -81,7 +81,7 @@ export const AppLayout: React.FC = () => {
         {isMock ? (
           <div className="bg-slate-100 border-b border-slate-200 px-3 sm:px-6 py-1 text-xs text-slate-700 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-1.5 min-w-0">
-              <Info className="w-3.5 h-3.5 text-[#0F766E] shrink-0" />
+              <Info className="w-3.5 h-3.5 text-[#11243A] shrink-0" />
               <p className="text-[11px] sm:text-xs font-medium truncate">
                 نسخة تجريبية — البيانات محلية وغير محفوظة بعد تحديث الصفحة
               </p>

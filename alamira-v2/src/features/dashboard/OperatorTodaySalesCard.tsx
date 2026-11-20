@@ -64,7 +64,7 @@ export const OperatorTodaySalesCard: React.FC<OperatorTodaySalesCardProps> = ({
       <CardHeader className="p-3.5 sm:p-4 pb-3 border-b border-[#E2E8F0] space-y-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="flex items-center gap-2 text-sm sm:text-[15px] font-extrabold text-[#11243A]">
-            <TrendingUp className="w-4.5 h-4.5 text-[#0F766E] shrink-0" />
+            <TrendingUp className="w-4.5 h-4.5 text-[#11243A] shrink-0" />
             <span>مبيعات اليوم</span>
           </CardTitle>
 
@@ -72,7 +72,7 @@ export const OperatorTodaySalesCard: React.FC<OperatorTodaySalesCardProps> = ({
             className="inline-flex items-center gap-1.5 text-xs text-slate-700 bg-slate-100/90 px-2.5 py-0.5 rounded-lg border border-slate-200 font-medium"
             title="التوقيت الرسمي المعتمد لمحافظة قنا – مصر"
           >
-            <Clock className="w-3.5 h-3.5 text-[#0F766E]" />
+            <Clock className="w-3.5 h-3.5 text-[#11243A]" />
             <span>{QENA_TIMEZONE_LABEL}</span>
           </span>
         </div>
@@ -89,14 +89,14 @@ export const OperatorTodaySalesCard: React.FC<OperatorTodaySalesCardProps> = ({
             <span className="text-[11px] font-bold text-[#64748B] block mb-0.5">
               قيمة المبيعات المحققة
             </span>
-            <div className="text-xl sm:text-2xl font-black text-[#0F766E] tabular-nums">
+            <div className="text-xl sm:text-2xl font-black text-[#11243A] tabular-nums">
               {formatCurrency(todaySales)}
             </div>
           </div>
 
           <div className="text-left">
             <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 bg-white px-2.5 py-1 rounded-md border border-slate-200 shadow-2xs">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#0F766E]" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#11243A]" />
               <span>{formatInvoiceCountArabic(approvedCount)}</span>
             </span>
           </div>

@@ -256,7 +256,7 @@ export const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-2 pb-3 border-b border-[#D9E2EC]">
-        <Database className="w-5 h-5 text-[#0F766E]" />
+        <Database className="w-5 h-5 text-[#11243A]" />
         <div>
           <h3 className="text-sm font-extrabold text-[#11243A]">
             النسخ الاحتياطي واستخراج البيانات
@@ -284,7 +284,7 @@ export const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
             variant="primary"
             onClick={handleExportExcelBackup}
             disabled={isExportingExcel || isExportingJson}
-            className="bg-[#0F766E] hover:bg-[#115E59] text-white text-xs font-bold px-4 h-9 border-none shadow-xs"
+            className="bg-[#11243A] hover:bg-[#1E3A5F] text-white text-xs font-bold px-4 h-9 border-none shadow-xs"
           >
             {isExportingExcel ? (
               <span className="flex items-center gap-1.5">

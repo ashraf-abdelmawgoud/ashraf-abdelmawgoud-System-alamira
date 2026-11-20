@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getSupabaseClient } from './supabaseClient'
+import { cacheService } from './cacheService'
 import {
   Product,
   ProductFormData,
@@ -20,6 +21,7 @@ import {
   SystemPreferences,
 } from '@/types'
 import { QENA_TIMEZONE } from '@/lib/formatters'
+import { isPrimaryAdmin } from '@/auth/rbac'
 
 /**
  * Real Supabase Production Data Service Adapter
@@ -37,105 +39,163 @@ export const supabaseDataService = {
     },
     currentUserRole?: string
   ): Promise<Product[]> {
-    const supabase = getSupabaseClient()
-    const isSalesOperator = currentUserRole === 'SALES_OPERATOR'
+    const cacheKey = cacheService.createKey('products', filters, currentUserRole)
+    return cacheService.getOrFetch(cacheKey, async () => {
+      const supabase = getSupabaseClient()
+      const isSalesOperator = currentUserRole === 'SALES_OPERATOR'
 
-    // Query products_secure_view (with server-side cost/stock masking) with fallback to products table
-    let { data, error } = await supabase
-      .from('products_secure_view')
-      .select('*')
-      .order('name', { ascending: true })
-
-    if (error && (error.code === '42P01' || error.message?.includes('does not exist') || error.message?.includes('relation'))) {
-      const fallback = await supabase
-        .from('products')
-        .select('*, categories(name)')
+      // Query products_secure_view (with server-side cost/stock masking) with fallback to products table
+      let { data, error } = await supabase
+        .from('products_secure_view')
+        .select('*')
         .order('name', { ascending: true })
-      data = fallback.data
-      error = fallback.error
-    }
 
-    if (error) {
-      throw new Error(`فشل جلب قائمة الأصناف من الخادم: ${error.message}`)
-    }
-
-    let prods: Product[] = (data || []).map((row: any) => {
-      const currentStock = isSalesOperator ? 0 : Number(row.current_stock || 0)
-      const purchasePrice = isSalesOperator ? 0 : Number(row.purchase_price || 0)
-      const sellingPrice = Number(row.selling_price || 0)
-      const minStockLevel = Number(row.min_stock_level || 0)
-      const realStock = Number(row.current_stock || 0)
-
-      return {
-        id: row.id,
-        sku: row.sku,
-        code: row.sku,
-        name: row.name,
-        category: row.category_name || row.categories?.name || 'عام',
-        unit: row.unit || 'قطعة',
-        allows_decimal_quantity: Boolean(row.allows_decimal_quantity),
-        purchase_price: purchasePrice,
-        costPrice: purchasePrice,
-        selling_price: sellingPrice,
-        sellingPrice: sellingPrice,
-        current_stock: currentStock,
-        currentStock: currentStock,
-        min_stock_level: minStockLevel,
-        minStockLevel: minStockLevel,
-        isLowStock: realStock <= minStockLevel,
-        description: row.description || '',
-        is_active: row.is_active !== false,
-        createdAt: row.created_at,
+      if (error && (error.code === '42P01' || error.message?.includes('does not exist') || error.message?.includes('relation'))) {
+        const fallback = await supabase
+          .from('products')
+          .select('*, categories(name)')
+          .order('name', { ascending: true })
+        data = fallback.data
+        error = fallback.error
       }
-    })
 
-    if (filters?.search) {
-      const q = filters.search.trim().toLowerCase()
-      prods = prods.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.sku.toLowerCase().includes(q) ||
-          (p.description && p.description.toLowerCase().includes(q))
-      )
-    }
-
-    if (filters?.category && filters.category !== 'all') {
-      prods = prods.filter((p) => p.category === filters.category)
-    }
-
-    if (filters?.status && filters.status !== 'all') {
-      if (filters.status === 'in_stock') {
-        prods = prods.filter((p) => p.current_stock > p.min_stock_level)
-      } else if (filters.status === 'low_stock') {
-        prods = prods.filter((p) => p.current_stock > 0 && p.current_stock <= p.min_stock_level)
-      } else if (filters.status === 'out_of_stock') {
-        prods = prods.filter((p) => p.current_stock <= 0)
+      if (error) {
+        throw new Error(`فشل جلب قائمة الأصناف من الخادم: ${error.message}`)
       }
-    }
 
-    return prods
+      let prods: Product[] = (data || []).map((row: any) => {
+        const currentStock = isSalesOperator ? 0 : Number(row.current_stock || 0)
+        const purchasePrice = isSalesOperator ? 0 : Number(row.purchase_price || 0)
+        const sellingPrice = Number(row.selling_price || 0)
+        const minStockLevel = Number(row.min_stock_level || 0)
+        const realStock = Number(row.current_stock || 0)
+
+        return {
+          id: row.id,
+          sku: row.sku,
+          code: row.sku,
+          name: row.name,
+          category: row.category_name || row.categories?.name || 'عام',
+          unit: row.unit || 'قطعة',
+          allows_decimal_quantity: Boolean(row.allows_decimal_quantity),
+          purchase_price: purchasePrice,
+          costPrice: purchasePrice,
+          selling_price: sellingPrice,
+          sellingPrice: sellingPrice,
+          current_stock: currentStock,
+          currentStock: currentStock,
+          min_stock_level: minStockLevel,
+          minStockLevel: minStockLevel,
+          isLowStock: realStock <= minStockLevel,
+          description: row.description || '',
+          is_active: row.is_active !== false,
+          createdAt: row.created_at,
+        }
+      })
+
+      if (filters?.search) {
+        const q = filters.search.trim().toLowerCase()
+        prods = prods.filter(
+          (p) =>
+            p.name.toLowerCase().includes(q) ||
+            p.sku.toLowerCase().includes(q) ||
+            (p.description && p.description.toLowerCase().includes(q))
+        )
+      }
+
+      if (filters?.category && filters.category !== 'all') {
+        prods = prods.filter((p) => p.category === filters.category)
+      }
+
+      if (filters?.status && filters.status !== 'all') {
+        if (filters.status === 'in_stock') {
+          prods = prods.filter((p) => p.current_stock > p.min_stock_level)
+        } else if (filters.status === 'low_stock') {
+          prods = prods.filter((p) => p.current_stock > 0 && p.current_stock <= p.min_stock_level)
+        } else if (filters.status === 'out_of_stock') {
+          prods = prods.filter((p) => p.current_stock <= 0)
+        }
+      }
+
+      return prods
+    }, 60_000)
   },
 
   async getCategories(): Promise<string[]> {
-    const supabase = getSupabaseClient()
-    const { data, error } = await supabase
-      .from('categories')
-      .select('name')
-      .order('name', { ascending: true })
+    return cacheService.getOrFetch('categories', async () => {
+      const supabase = getSupabaseClient()
+      const { data, error } = await supabase
+        .from('categories')
+        .select('name')
+        .order('name', { ascending: true })
 
-    if (error || !data || data.length === 0) {
-      // Fallback: extract distinct categories from products
-      const { data: pData } = await supabase.from('products').select('categories(name)')
-      if (pData) {
-        const unique = Array.from(new Set(pData.map((p: any) => p.categories?.name).filter(Boolean)))
-        if (unique.length > 0) return unique as string[]
+      if (error) {
+        throw new Error(`فشل جلب قائمة الأقسام والتصنيفات من الخادم: ${error.message}`)
       }
-      return ['حلويات شرقية', 'حلويات غربية', 'مخبوزات وطواجن', 'مشروبات', 'عام']
-    }
-    return data.map((c: any) => c.name)
+
+      if (!data || data.length === 0) {
+        // If categories table has no rows, check if products have assigned category names
+        const { data: pData, error: pError } = await supabase.from('products').select('categories(name)')
+        if (!pError && pData) {
+          const unique = Array.from(new Set(pData.map((p: any) => p.categories?.name).filter(Boolean)))
+          if (unique.length > 0) return unique as string[]
+        }
+        return []
+      }
+      return data.map((c: any) => c.name)
+    }, 5 * 60_000)
   },
 
   async getProductById(id: string, currentUserRole?: string): Promise<Product | null> {
+    const isSalesOperator = currentUserRole === 'SALES_OPERATOR'
+    try {
+      const supabase = getSupabaseClient()
+      const query: any = supabase.from('products_secure_view').select('*')
+      if (typeof query?.eq === 'function') {
+        const eqQuery = query.eq('id', id)
+        let data: any = null
+        if (typeof eqQuery?.maybeSingle === 'function') {
+          const res = await eqQuery.maybeSingle()
+          data = res.data
+        } else if (typeof eqQuery?.single === 'function') {
+          const res = await eqQuery.single()
+          data = res.data
+        }
+
+        if (data) {
+          const currentStock = isSalesOperator ? 0 : Number(data.current_stock || 0)
+          const purchasePrice = isSalesOperator ? 0 : Number(data.purchase_price || 0)
+          const sellingPrice = Number(data.selling_price || 0)
+          const minStockLevel = Number(data.min_stock_level || 0)
+          const realStock = Number(data.current_stock || 0)
+
+          return {
+            id: data.id,
+            sku: data.sku,
+            code: data.sku,
+            name: data.name,
+            category: data.category_name || data.categories?.name || 'عام',
+            unit: data.unit || 'قطعة',
+            allows_decimal_quantity: Boolean(data.allows_decimal_quantity),
+            purchase_price: purchasePrice,
+            costPrice: purchasePrice,
+            selling_price: sellingPrice,
+            sellingPrice: sellingPrice,
+            current_stock: currentStock,
+            currentStock: currentStock,
+            min_stock_level: minStockLevel,
+            minStockLevel: minStockLevel,
+            isLowStock: realStock <= minStockLevel,
+            description: data.description || '',
+            is_active: data.is_active !== false,
+            createdAt: data.created_at,
+          }
+        }
+      }
+    } catch {
+      // Fallback to searching the products list
+    }
+
     const prods = await this.getProducts(undefined, currentUserRole)
     return prods.find((p) => p.id === id) || null
   },
@@ -170,6 +230,10 @@ export const supabaseDataService = {
 
     const newProductId = result?.product_id || result?.id
 
+    // Invalidate product cache
+    cacheService.invalidateNamespace('products')
+    cacheService.invalidateNamespace('dashboard')
+
     // Record audit event
     await this.recordAuditLog({
       action: 'PRODUCT_CREATE',
@@ -191,6 +255,8 @@ export const supabaseDataService = {
     })
 
     const created = await this.getProductById(newProductId, actor.role)
+    cacheService.invalidateNamespace('products')
+    cacheService.invalidateNamespace('dashboard')
     if (!created) {
       return {
         id: newProductId,
@@ -240,6 +306,9 @@ export const supabaseDataService = {
     const { error } = await supabase.from('products').update(updatePayload).eq('id', id)
     if (error) throw new Error(`فشل تحديث بيانات الصنف: ${error.message}`)
 
+    cacheService.invalidateNamespace('products')
+    cacheService.invalidateNamespace('dashboard')
+
     await this.recordAuditLog({
       action: 'PRODUCT_UPDATE',
       category: 'inventory',
@@ -267,6 +336,9 @@ export const supabaseDataService = {
 
     if (error) throw new Error(`فشل تغيير حالة تفعيل الصنف: ${error.message}`)
 
+    cacheService.invalidateNamespace('products')
+    cacheService.invalidateNamespace('dashboard')
+
     await this.recordAuditLog({
       action: 'PRODUCT_STATUS_CHANGE',
       category: 'products',
@@ -291,6 +363,9 @@ export const supabaseDataService = {
     const { error } = await supabase.rpc('delete_product', { p_product_id: id })
     if (error) throw new Error(`فشل حذف الصنف: ${error.message}`)
 
+    cacheService.invalidateNamespace('products')
+    cacheService.invalidateNamespace('dashboard')
+
     await this.recordAuditLog({
       action: 'PRODUCT_DELETE',
       category: 'products',
@@ -309,44 +384,47 @@ export const supabaseDataService = {
   // CUSTOMERS
   // =========================================================================
   async getCustomers(filters?: { search?: string; status?: CustomerStatus }): Promise<Customer[]> {
-    const supabase = getSupabaseClient()
-    const { data, error } = await supabase
-      .from('customers')
-      .select('*')
-      .order('name', { ascending: true })
+    const cacheKey = cacheService.createKey('customers', filters)
+    return cacheService.getOrFetch(cacheKey, async () => {
+      const supabase = getSupabaseClient()
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .order('name', { ascending: true })
 
-    if (error) throw new Error(`فشل جلب قائمة العملاء: ${error.message}`)
+      if (error) throw new Error(`فشل جلب قائمة العملاء: ${error.message}`)
 
-    let customers: Customer[] = (data || []).map((row: any) => ({
-      id: row.id,
-      name: row.name,
-      phone: row.phone || '',
-      address: row.address || '',
-      city: row.address || '',
-      notes: row.notes || '',
-      is_active: row.is_active !== false,
-      created_by: row.created_by,
-      createdAt: row.created_at,
-      balance: 0,
-      invoices_count: 0,
-    }))
+      let customers: Customer[] = (data || []).map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        phone: row.phone || '',
+        address: row.address || '',
+        city: row.address || '',
+        notes: row.notes || '',
+        is_active: row.is_active !== false,
+        created_by: row.created_by,
+        createdAt: row.created_at,
+        balance: 0,
+        invoices_count: 0,
+      }))
 
-    if (filters?.search) {
-      const q = filters.search.trim().toLowerCase()
-      customers = customers.filter(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.phone?.includes(q) ||
-          (c.address && c.address.toLowerCase().includes(q))
-      )
-    }
+      if (filters?.search) {
+        const q = filters.search.trim().toLowerCase()
+        customers = customers.filter(
+          (c) =>
+            c.name.toLowerCase().includes(q) ||
+            c.phone?.includes(q) ||
+            (c.address && c.address.toLowerCase().includes(q))
+        )
+      }
 
-    if (filters?.status && filters.status !== 'all') {
-      const isActive = filters.status === 'active'
-      customers = customers.filter((c) => c.is_active === isActive)
-    }
+      if (filters?.status && filters.status !== 'all') {
+        const isActive = filters.status === 'active'
+        customers = customers.filter((c) => c.is_active === isActive)
+      }
 
-    return customers
+      return customers
+    }, 60_000)
   },
 
   async createCustomer(data: CustomerFormData, actor: User): Promise<Customer> {
@@ -368,6 +446,9 @@ export const supabaseDataService = {
       .single()
 
     if (error) throw new Error(`فشل إضافة العميل: ${error.message}`)
+
+    cacheService.invalidateNamespace('customers')
+    cacheService.invalidateNamespace('dashboard')
 
     await this.recordAuditLog({
       action: 'CUSTOMER_CREATE',
@@ -415,6 +496,9 @@ export const supabaseDataService = {
       .single()
 
     if (error) throw new Error(`فشل تعديل بيانات العميل: ${error.message}`)
+
+    cacheService.invalidateNamespace('customers')
+    cacheService.invalidateNamespace('dashboard')
 
     await this.recordAuditLog({
       action: 'CUSTOMER_UPDATE',
@@ -466,6 +550,9 @@ export const supabaseDataService = {
     const { error } = await supabase.from('customers').delete().eq('id', id)
     if (error) throw new Error(`فشل حذف العميل: ${error.message}`)
 
+    cacheService.invalidateNamespace('customers')
+    cacheService.invalidateNamespace('dashboard')
+
     await this.recordAuditLog({
       action: 'CUSTOMER_DELETE',
       category: 'customers',
@@ -486,43 +573,46 @@ export const supabaseDataService = {
   // SUPPLIERS
   // =========================================================================
   async getSuppliers(filters?: { search?: string; status?: SupplierStatus }): Promise<Supplier[]> {
-    const supabase = getSupabaseClient()
-    const { data, error } = await supabase
-      .from('suppliers')
-      .select('*')
-      .order('name', { ascending: true })
+    const cacheKey = cacheService.createKey('suppliers', filters)
+    return cacheService.getOrFetch(cacheKey, async () => {
+      const supabase = getSupabaseClient()
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('*')
+        .order('name', { ascending: true })
 
-    if (error) throw new Error(`فشل جلب قائمة الموردين: ${error.message}`)
+      if (error) throw new Error(`فشل جلب قائمة الموردين: ${error.message}`)
 
-    let suppliers: Supplier[] = (data || []).map((row: any) => ({
-      id: row.id,
-      name: row.name,
-      phone: row.phone || '',
-      address: row.address || '',
-      city: row.address || '',
-      notes: row.notes || '',
-      is_active: row.is_active !== false,
-      balance: 0,
-      receipts_count: 0,
-      createdAt: row.created_at,
-    }))
+      let suppliers: Supplier[] = (data || []).map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        phone: row.phone || '',
+        address: row.address || '',
+        city: row.address || '',
+        notes: row.notes || '',
+        is_active: row.is_active !== false,
+        balance: 0,
+        receipts_count: 0,
+        createdAt: row.created_at,
+      }))
 
-    if (filters?.search) {
-      const q = filters.search.trim().toLowerCase()
-      suppliers = suppliers.filter(
-        (s) =>
-          s.name.toLowerCase().includes(q) ||
-          s.phone?.includes(q) ||
-          (s.address && s.address.toLowerCase().includes(q))
-      )
-    }
+      if (filters?.search) {
+        const q = filters.search.trim().toLowerCase()
+        suppliers = suppliers.filter(
+          (s) =>
+            s.name.toLowerCase().includes(q) ||
+            s.phone?.includes(q) ||
+            (s.address && s.address.toLowerCase().includes(q))
+        )
+      }
 
-    if (filters?.status && filters.status !== 'all') {
-      const isActive = filters.status === 'active'
-      suppliers = suppliers.filter((s) => s.is_active === isActive)
-    }
+      if (filters?.status && filters.status !== 'all') {
+        const isActive = filters.status === 'active'
+        suppliers = suppliers.filter((s) => s.is_active === isActive)
+      }
 
-    return suppliers
+      return suppliers
+    }, 60_000)
   },
 
   async createSupplier(data: SupplierFormData, actor: User): Promise<Supplier> {
@@ -541,6 +631,8 @@ export const supabaseDataService = {
       .single()
 
     if (error) throw new Error(`فشل إضافة المورد: ${error.message}`)
+
+    cacheService.invalidateNamespace('suppliers')
 
     await this.recordAuditLog({
       action: 'SUPPLIER_CREATE',
@@ -586,6 +678,8 @@ export const supabaseDataService = {
 
     if (error) throw new Error(`فشل تحديث بيانات المورد: ${error.message}`)
 
+    cacheService.invalidateNamespace('suppliers')
+
     await this.recordAuditLog({
       action: 'SUPPLIER_UPDATE',
       category: 'suppliers',
@@ -622,6 +716,8 @@ export const supabaseDataService = {
     const { error } = await supabase.from('suppliers').delete().eq('id', id)
     if (error) throw new Error(`فشل حذف المورد: ${error.message}`)
 
+    cacheService.invalidateNamespace('suppliers')
+
     await this.recordAuditLog({
       action: 'SUPPLIER_DELETE',
       category: 'suppliers',
@@ -642,56 +738,131 @@ export const supabaseDataService = {
   // SALES INVOICES & ATOMIC TRANSACTIONS
   // =========================================================================
   async getInvoices(): Promise<SalesInvoice[]> {
-    const supabase = getSupabaseClient()
-    const { data, error } = await supabase
-      .from('sales_invoices')
-      .select('*, items:sales_invoice_items(*), customers(name, phone)')
-      .order('created_at', { ascending: false })
+    const cacheKey = cacheService.createKey('invoices')
+    return cacheService.getOrFetch(cacheKey, async () => {
+      const supabase = getSupabaseClient()
+      const { data, error } = await supabase
+        .from('sales_invoices')
+        .select('*, items:sales_invoice_items(*), customers(name, phone)')
+        .order('created_at', { ascending: false })
 
-    if (error) throw new Error(`فشل جلب فواتير المبيعات: ${error.message}`)
+      if (error) throw new Error(`فشل جلب فواتير المبيعات: ${error.message}`)
 
-    return (data || []).map((row: any) => ({
-      id: row.id,
-      invoice_number: row.invoice_number,
-      invoice_date: row.invoice_date,
-      customer_id: row.customer_id,
-      customer_name_snapshot: row.customer_name_snapshot || row.customers?.name || 'عميل نقدي',
-      customer_phone_snapshot: row.customer_phone_snapshot || row.customers?.phone || '',
-      gross_amount: Number(row.gross_amount || 0),
-      item_discounts_amount: Number(row.item_discounts_amount || 0),
-      subtotal: Number(row.subtotal || 0),
-      invoice_discount_type: row.invoice_discount_type || 'none',
-      invoice_discount_value: Number(row.invoice_discount_value || 0),
-      invoice_discount_amount: Number(row.invoice_discount_amount || 0),
-      additional_charges: Number(row.additional_charges || 0),
-      final_total: Number(row.final_total || 0),
-      status: row.status,
-      payment_terms: row.payment_terms || 'cash',
-      notes: row.notes || '',
-      cancellation_reason: row.cancellation_reason || '',
-      created_by: row.created_by,
-      approved_by: row.approved_by,
-      approved_at: row.approved_at,
-      cancelled_by: row.cancelled_by,
-      cancelled_at: row.cancelled_at,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      items: (row.items || []).map((item: any) => ({
-        id: item.id,
-        invoice_id: item.invoice_id,
-        product_id: item.product_id,
-        product_sku_snapshot: item.product_sku_snapshot,
-        product_name_snapshot: item.product_name_snapshot,
-        unit_snapshot: item.unit_snapshot,
-        quantity: Number(item.quantity || 0),
-        unit_price: Number(item.unit_price || 0),
-        gross_amount: Number(item.gross_amount || 0),
-        discount_type: item.discount_type || 'none',
-        discount_value: Number(item.discount_value || 0),
-        discount_amount: Number(item.discount_amount || 0),
-        net_amount: Number(item.net_amount || 0),
-      })),
-    }))
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        invoice_number: row.invoice_number,
+        invoice_date: row.invoice_date,
+        customer_id: row.customer_id,
+        customer_name_snapshot: row.customer_name_snapshot || row.customers?.name || 'عميل نقدي',
+        customer_phone_snapshot: row.customer_phone_snapshot || row.customers?.phone || '',
+        gross_amount: Number(row.gross_amount || 0),
+        item_discounts_amount: Number(row.item_discounts_amount || 0),
+        subtotal: Number(row.subtotal || 0),
+        invoice_discount_type: row.invoice_discount_type || 'none',
+        invoice_discount_value: Number(row.invoice_discount_value || 0),
+        invoice_discount_amount: Number(row.invoice_discount_amount || 0),
+        additional_charges: Number(row.additional_charges || 0),
+        final_total: Number(row.final_total || 0),
+        status: row.status,
+        payment_terms: row.payment_terms || 'cash',
+        notes: row.notes || '',
+        cancel_reason: row.cancel_reason || row.cancellation_reason || null,
+        created_by: row.created_by,
+        approved_by: row.approved_by,
+        approved_at: row.approved_at,
+        cancelled_by: row.cancelled_by,
+        cancelled_at: row.cancelled_at,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        items: (row.items || []).map((item: any) => ({
+          id: item.id,
+          invoice_id: item.invoice_id,
+          product_id: item.product_id,
+          product_sku_snapshot: item.product_sku_snapshot,
+          product_name_snapshot: item.product_name_snapshot,
+          unit_snapshot: item.unit_snapshot,
+          quantity: Number(item.quantity || 0),
+          unit_price: Number(item.unit_price || 0),
+          gross_amount: Number(item.gross_amount || 0),
+          discount_type: item.discount_type || 'none',
+          discount_value: Number(item.discount_value || 0),
+          discount_amount: Number(item.discount_amount || 0),
+          net_amount: Number(item.net_amount || 0),
+        })),
+      }))
+    }, 30_000)
+  },
+
+  async getInvoiceById(id: string): Promise<SalesInvoice | null> {
+    try {
+      const supabase = getSupabaseClient()
+      const query: any = supabase
+        .from('sales_invoices')
+        .select('*, items:sales_invoice_items(*), customers(name, phone)')
+
+      if (typeof query?.eq === 'function') {
+        const eqQuery = query.eq('id', id)
+        let data: any = null
+        if (typeof eqQuery?.maybeSingle === 'function') {
+          const res = await eqQuery.maybeSingle()
+          data = res.data
+        } else if (typeof eqQuery?.single === 'function') {
+          const res = await eqQuery.single()
+          data = res.data
+        }
+
+        if (data) {
+          return {
+            id: data.id,
+            invoice_number: data.invoice_number,
+            invoice_date: data.invoice_date,
+            customer_id: data.customer_id,
+            customer_name_snapshot: data.customer_name_snapshot || data.customers?.name || 'عميل نقدي',
+            customer_phone_snapshot: data.customer_phone_snapshot || data.customers?.phone || '',
+            gross_amount: Number(data.gross_amount || 0),
+            item_discounts_amount: Number(data.item_discounts_amount || 0),
+            subtotal: Number(data.subtotal || 0),
+            invoice_discount_type: data.invoice_discount_type || 'none',
+            invoice_discount_value: Number(data.invoice_discount_value || 0),
+            invoice_discount_amount: Number(data.invoice_discount_amount || 0),
+            additional_charges: Number(data.additional_charges || 0),
+            final_total: Number(data.final_total || 0),
+            status: data.status,
+            payment_terms: data.payment_terms || 'cash',
+            notes: data.notes || '',
+            cancel_reason: data.cancel_reason || data.cancellation_reason || null,
+            created_by: data.created_by,
+            approved_by: data.approved_by,
+            approved_at: data.approved_at,
+            cancelled_by: data.cancelled_by,
+            cancelled_at: data.cancelled_at,
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            items: (data.items || []).map((item: any) => ({
+              id: item.id,
+              invoice_id: item.invoice_id,
+              product_id: item.product_id,
+              product_sku_snapshot: item.product_sku_snapshot,
+              product_name_snapshot: item.product_name_snapshot,
+              unit_snapshot: item.unit_snapshot,
+              quantity: Number(item.quantity || 0),
+              unit_price: Number(item.unit_price || 0),
+              gross_amount: Number(item.gross_amount || 0),
+              discount_type: item.discount_type || 'none',
+              discount_value: Number(item.discount_value || 0),
+              discount_amount: Number(item.discount_amount || 0),
+              net_amount: Number(item.net_amount || 0),
+            })),
+          }
+        }
+      }
+    } catch {
+      // Fallback below
+    }
+
+    // Fallback: search cached invoice list
+    const all = await this.getInvoices()
+    return all.find((i) => i.id === id) || null
   },
 
   async createInvoice(data: SalesInvoiceFormData, actor: User): Promise<SalesInvoice> {
@@ -716,15 +887,23 @@ export const supabaseDataService = {
     let itemDiscounts = 0
     let subtotal = 0
 
+    // Batch fetch product details in a single query instead of N sequential loop queries
+    const productIds = Array.from(new Set(data.items.map((i) => i.product_id)))
+    const { data: dbProducts, error: prodErr } = await supabase
+      .from('products')
+      .select('id, name, sku, unit, selling_price')
+      .in('id', productIds)
+
+    if (prodErr || !dbProducts) {
+      throw new Error(`فشل استعلام بيانات الأصناف في الفاتورة: ${prodErr?.message || 'غير موجودة'}`)
+    }
+
+    const productMap = new Map<string, any>(dbProducts.map((p: any) => [p.id, p]))
+
     const itemsToInsert = []
     for (const item of data.items) {
-      const { data: prod } = await supabase
-        .from('products')
-        .select('name, sku, unit, selling_price')
-        .eq('id', item.product_id)
-        .single()
-
-      if (!prod) throw new Error(`الصنف ${item.product_id} غير موجود`)
+      const prod = productMap.get(item.product_id)
+      if (!prod) throw new Error(`الصنف ${item.product_id} غير موجود في قاعدة البيانات`)
 
       const qty = Number(item.quantity)
       const price = Number(item.unit_price || prod.selling_price)
@@ -802,6 +981,11 @@ export const supabaseDataService = {
     const { error: itemsError } = await supabase.from('sales_invoice_items').insert(itemsWithInvId)
     if (itemsError) throw new Error(`فشل إدراج بنود الفاتورة: ${itemsError.message}`)
 
+    // Invalidate caches
+    cacheService.invalidateNamespace('invoices')
+    cacheService.invalidateNamespace('products')
+    cacheService.invalidateNamespace('dashboard')
+
     // If action is approve, call atomic approve RPC
     if (data.action === 'approve') {
       return this.approveInvoice(invHeader.id, actor)
@@ -821,7 +1005,9 @@ export const supabaseDataService = {
       timestamp: new Date().toISOString(),
     })
 
-    return (await this.getInvoices()).find((i) => i.id === invHeader.id)!
+    const createdInv = await this.getInvoiceById(invHeader.id)
+    if (!createdInv) throw new Error('فشل استرجاع الفاتورة المنشأة')
+    return createdInv
   },
 
   async updateDraftInvoice(id: string, data: SalesInvoiceFormData, actor: User): Promise<SalesInvoice> {
@@ -829,7 +1015,7 @@ export const supabaseDataService = {
     const isSalesOperator = actor.role === 'SALES_OPERATOR'
 
     // Verify invoice exists and is draft
-    const existing = (await this.getInvoices()).find((i) => i.id === id)
+    const existing = await this.getInvoiceById(id)
     if (!existing) throw new Error('مسودة الفاتورة غير موجودة')
     if (existing.status !== 'draft') throw new Error('لا يمكن تعديل فاتورة معتمدة أو ملغاة')
 
@@ -934,6 +1120,11 @@ export const supabaseDataService = {
     const itemsWithInvId = itemsToInsert.map((it) => ({ ...it, invoice_id: id }))
     await supabase.from('sales_invoice_items').insert(itemsWithInvId)
 
+    // Invalidate caches
+    cacheService.invalidateNamespace('invoices')
+    cacheService.invalidateNamespace('products')
+    cacheService.invalidateNamespace('dashboard')
+
     if (data.action === 'approve') {
       return this.approveInvoice(id, actor)
     }
@@ -952,7 +1143,9 @@ export const supabaseDataService = {
       timestamp: new Date().toISOString(),
     })
 
-    return (await this.getInvoices()).find((i) => i.id === id)!
+    const updatedInv = await this.getInvoiceById(id)
+    if (!updatedInv) throw new Error('فشل استرجاع الفاتورة المحدثة')
+    return updatedInv
   },
 
   async approveInvoice(invoiceId: string, actor: User): Promise<SalesInvoice> {
@@ -980,6 +1173,11 @@ export const supabaseDataService = {
       throw new Error(`فشل اعتماد الفاتورة: ${error.message}`)
     }
 
+    // Invalidate caches (stock and sales changed)
+    cacheService.invalidateNamespace('invoices')
+    cacheService.invalidateNamespace('products')
+    cacheService.invalidateNamespace('dashboard')
+
     await this.recordAuditLog({
       action: 'INVOICE_APPROVE',
       category: 'sales',
@@ -994,7 +1192,7 @@ export const supabaseDataService = {
       timestamp: new Date().toISOString(),
     })
 
-    const inv = (await this.getInvoices()).find((i) => i.id === invoiceId)
+    const inv = await this.getInvoiceById(invoiceId)
     if (!inv) throw new Error('الفاتورة غير موجودة بعد الاعتماد')
     return inv
   },
@@ -1027,6 +1225,11 @@ export const supabaseDataService = {
       throw new Error(`فشل إلغاء الفاتورة: ${error.message}`)
     }
 
+    // Invalidate caches (stock restored and sales reversed)
+    cacheService.invalidateNamespace('invoices')
+    cacheService.invalidateNamespace('products')
+    cacheService.invalidateNamespace('dashboard')
+
     await this.recordAuditLog({
       action: 'INVOICE_CANCEL',
       category: 'sales',
@@ -1041,7 +1244,7 @@ export const supabaseDataService = {
       timestamp: new Date().toISOString(),
     })
 
-    const inv = (await this.getInvoices()).find((i) => i.id === invoiceId)
+    const inv = await this.getInvoiceById(invoiceId)
     if (!inv) throw new Error('الفاتورة غير موجودة بعد الإلغاء')
     return inv
   },
@@ -1123,13 +1326,13 @@ export const supabaseDataService = {
   // =========================================================================
   // INVENTORY MOVEMENTS
   // =========================================================================
-  async getInventoryMovements(): Promise<InventoryMovementLog[]> {
+  async getInventoryMovements(limit = 200): Promise<InventoryMovementLog[]> {
     const supabase = getSupabaseClient()
     const { data, error } = await supabase
       .from('inventory_movements')
       .select('*, products(name, sku, unit)')
       .order('created_at', { ascending: false })
-      .limit(200)
+      .limit(limit)
 
     if (error) throw new Error(`فشل جلب سجل حركات المخزن: ${error.message}`)
 
@@ -1210,11 +1413,65 @@ export const supabaseDataService = {
   // =========================================================================
   // DASHBOARD SUMMARY (AFRICA/CAIRO TIMEZONE)
   // =========================================================================
-  async getDashboardSummary(): Promise<DashboardSummary> {
-    const invoices = await this.getInvoices()
-    const products = await this.getProducts(undefined, 'ADMIN')
-    const movements = await this.getInventoryMovements()
-    const customers = await this.getCustomers()
+  async getDashboardSummary(options?: {
+    invoices?: SalesInvoice[]
+    products?: Product[]
+    currentUserRole?: string
+  }): Promise<DashboardSummary> {
+    const supabase = getSupabaseClient()
+    const isSalesOperator = options?.currentUserRole === 'SALES_OPERATOR'
+
+    // 1. Invoices: reuse if provided, otherwise fetch
+    const invoices = options?.invoices ?? (await this.getInvoices())
+
+    // 2. Products: reuse if provided, otherwise fetch only if not sales operator or if needed
+    let products = options?.products
+    if (!products) {
+      products = isSalesOperator ? [] : await this.getProducts(undefined, options?.currentUserRole)
+    }
+
+    // 3. Inventory movements: bounded fetch (limit 6) and safe error handling
+    let recentMovements: DashboardSummary['recentMovements'] = []
+    if (!isSalesOperator) {
+      try {
+        const movements = await this.getInventoryMovements(6)
+        recentMovements = movements.slice(0, 6).map((m) => ({
+          id: m.id,
+          productId: m.product_id,
+          productCode: m.product_sku || '',
+          productName: m.product_name || '',
+          movementType: m.movement_type,
+          movementNumber: m.source_doc_number,
+          quantity: m.quantity_in > 0 ? m.quantity_in : m.quantity_out,
+          unit: m.unit || 'قطعة',
+          reference: m.source_doc_number,
+          performedBy: m.created_by || 'النظام',
+          date: m.created_at || new Date().toISOString(),
+        }))
+      } catch (movErr) {
+        console.warn('Could not fetch recent inventory movements for dashboard:', movErr)
+      }
+    }
+
+    // 4. Active customers count: lightweight head count query to avoid fetching all customer rows
+    let activeCustomersCount = 0
+    try {
+      const { count, error: countErr } = await supabase
+        .from('customers')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true)
+
+      if (!countErr && typeof count === 'number') {
+        activeCustomersCount = count
+      } else {
+        const custs = await this.getCustomers()
+        activeCustomersCount = custs.filter((c) => c.is_active).length
+      }
+    } catch {
+      // Fallback in case of count error
+      const custs = await this.getCustomers()
+      activeCustomersCount = custs.filter((c) => c.is_active).length
+    }
 
     // Determine current day in Africa/Cairo
     const now = new Date()
@@ -1241,7 +1498,7 @@ export const supabaseDataService = {
       totalSales,
       totalProductsCount: products.filter((p) => p.is_active).length,
       lowStockProductsCount: lowStockCount,
-      activeCustomersCount: customers.filter((c) => c.is_active).length,
+      activeCustomersCount,
       salesTrends: [],
       recentInvoices: approvedInvoices.slice(0, 5).map((i) => ({
         id: i.id,
@@ -1258,19 +1515,7 @@ export const supabaseDataService = {
         paidAmount: i.final_total,
         remainingAmount: 0,
       })),
-      recentMovements: movements.slice(0, 6).map((m) => ({
-        id: m.id,
-        productId: m.product_id,
-        productCode: m.product_sku || '',
-        productName: m.product_name || '',
-        movementType: m.movement_type,
-        movementNumber: m.source_doc_number,
-        quantity: m.quantity_in > 0 ? m.quantity_in : m.quantity_out,
-        unit: m.unit || 'قطعة',
-        reference: m.source_doc_number,
-        performedBy: m.created_by || 'النظام',
-        date: m.created_at || new Date().toISOString(),
-      })),
+      recentMovements,
     }
   },
 
@@ -1385,26 +1630,32 @@ export const supabaseDataService = {
   // USER ACCOUNTS
   // =========================================================================
   async getUsers(): Promise<User[]> {
-    const supabase = getSupabaseClient()
-    const { data, error } = await supabase
-      .from('authorized_users')
-      .select('*')
-      .order('full_name', { ascending: true })
+    return cacheService.getOrFetch<User[]>('users:all', async () => {
+      const supabase = getSupabaseClient()
+      const { data, error } = await supabase
+        .from('authorized_users')
+        .select('*')
+        .order('full_name', { ascending: true })
 
-    if (error) throw new Error(`فشل جلب قائمة المستخدمين: ${error.message}`)
+      if (error) throw new Error(`فشل جلب قائمة المستخدمين: ${error.message}`)
 
-    return (data || []).map((row: any) => ({
-      id: row.user_id,
-      name: row.full_name,
-      email: row.email,
-      role: (row.role as 'ADMIN' | 'SALES_OPERATOR') || 'ADMIN',
-      username: row.username || (row.email ? row.email.split('@')[0] : 'user'),
-      title: row.role === 'SALES_OPERATOR' ? 'مسؤول مبيعات' : 'مدير النظام',
-      is_active: row.is_active !== false,
-    }))
+      return (data || []).map((row: any) => ({
+        id: row.user_id,
+        name: row.full_name,
+        email: row.email,
+        role: (row.role as 'ADMIN' | 'SALES_OPERATOR') || 'ADMIN',
+        username: row.username || (row.email ? row.email.split('@')[0] : 'user'),
+        title: row.role === 'SALES_OPERATOR' ? 'مسؤول مبيعات' : 'مدير النظام',
+        is_active: row.is_active !== false,
+      }))
+    }, 30000)
   },
 
   async toggleUserActive(userId: string, actor: User): Promise<User> {
+    if (isPrimaryAdmin(userId)) {
+      throw new Error('لا يمكن تعطيل أو حذف حساب المدير الأساسي.')
+    }
+
     const supabase = getSupabaseClient()
     if (actor.role !== 'ADMIN') {
       throw new Error('غير مصرح: إدارة وتعديل حالة المستخدمين مقتصرة على مدير النظام فقط')
@@ -1427,6 +1678,8 @@ export const supabaseDataService = {
       .single()
 
     if (updateErr) throw new Error(`فشل تعديل حالة المستخدم: ${updateErr.message}`)
+
+    cacheService.invalidateNamespace('users')
 
     await this.recordAuditLog({
       action: 'USER_STATUS_CHANGE',
@@ -1453,10 +1706,111 @@ export const supabaseDataService = {
     }
   },
 
+  async createSalesOperator(
+    data: { email: string; password?: string; full_name: string; username?: string; phone?: string },
+    actor: User
+  ): Promise<User> {
+    if (actor.role !== 'ADMIN') {
+      throw new Error('غير مصرح: إضافة مسؤولي المبيعات مقتصرة على مدير النظام فقط')
+    }
+
+    const cleanEmail = (data.email || '').trim().toLowerCase()
+    const cleanName = (data.full_name || '').trim()
+    const cleanPassword = (data.password || '').trim()
+
+    if (!cleanEmail || !cleanName) {
+      throw new Error('الاسم والبريد الإلكتروني مطلوبان لإنشاء حساب مسؤول المبيعات')
+    }
+
+    if (!cleanPassword || cleanPassword.length < 8) {
+      throw new Error('كلمة المرور مطلوبة ويجب أن تتكون من 8 أحرف على الأقل')
+    }
+
+    const supabase = getSupabaseClient()
+
+    // Invoke server-side Supabase Edge Function to create identity in auth.users + authorized_users
+    const { data: result, error: funcError } = await supabase.functions.invoke(
+      'create-sales-operator',
+      {
+        body: {
+          email: cleanEmail,
+          password: cleanPassword,
+          full_name: cleanName,
+          username: data.username?.trim().toLowerCase() || cleanEmail.split('@')[0],
+          phone: data.phone?.trim() || null,
+        },
+      }
+    )
+
+    if (funcError) {
+      let customError = funcError.message
+      try {
+        const contextResponse = (funcError as { context?: Response }).context
+        if (contextResponse && typeof contextResponse.json === 'function') {
+          const body = await contextResponse.json()
+          if (body?.error) {
+            customError = body.error
+          }
+        }
+      } catch {
+        // Fall back to funcError.message
+      }
+      throw new Error(customError)
+    }
+
+    if (!result || !result.success || !result.user) {
+      throw new Error(result?.error || result?.message || 'فشل إنشاء حساب مسؤول المبيعات عبر الخادم')
+    }
+
+    const created = result.user
+    cacheService.invalidateNamespace('users')
+
+    await this.recordAuditLog({
+      action: 'USER_CREATE',
+      category: 'admin',
+      entity_type: 'user',
+      entity_id: created.id,
+      entity_name_or_number: created.name || created.full_name,
+      performed_by: actor.name,
+      performed_by_id: actor.id,
+      performed_by_role: actor.role,
+      outcome: 'success',
+      details: { role: 'SALES_OPERATOR', email: cleanEmail },
+      timestamp: new Date().toISOString(),
+    })
+
+    return {
+      id: created.id,
+      name: created.name || created.full_name,
+      email: created.email,
+      role: 'SALES_OPERATOR',
+      username: created.username || cleanEmail.split('@')[0],
+      title: 'مسؤول مبيعات',
+      is_active: created.is_active !== false,
+    }
+  },
+
   async createUser(data: Partial<User>, actor: User): Promise<User> {
     const supabase = getSupabaseClient()
     if (actor.role !== 'ADMIN') {
       throw new Error('غير مصرح: إضافة مستخدمين جدد مقتصرة على مدير النظام فقط')
+    }
+
+    // If sales operator with email and name, delegate to edge function
+    if (data.role === 'SALES_OPERATOR' && data.email && data.name) {
+      try {
+        return await this.createSalesOperator(
+          {
+            email: data.email,
+            full_name: data.name,
+            username: data.username,
+          },
+          actor
+        )
+      } catch (err: unknown) {
+        // If function not yet deployed or in local tests, proceed to direct insert fallback
+        console.warn('Edge Function fallback to direct insert:', err)
+      }
     }
 
     const newId = crypto.randomUUID()
@@ -1474,6 +1828,8 @@ export const supabaseDataService = {
       .single()
 
     if (error) throw new Error(`فشل إضافة المستخدم إلى قائمة المستخدمين المصرح لهم: ${error.message}`)
+
+    cacheService.invalidateNamespace('users')
 
     await this.recordAuditLog({
       action: 'USER_CREATE',
@@ -1500,6 +1856,15 @@ export const supabaseDataService = {
   },
 
   async updateUser(userId: string, data: Partial<User>, actor: User): Promise<User> {
+    if (isPrimaryAdmin(userId)) {
+      if (data.is_active === false) {
+        throw new Error('لا يمكن تعطيل أو حذف حساب المدير الأساسي.')
+      }
+      if (data.role && data.role !== 'ADMIN') {
+        throw new Error('لا يمكن تغيير دور أو خفض صلاحيات حساب المدير الأساسي.')
+      }
+    }
+
     const supabase = getSupabaseClient()
     if (actor.role !== 'ADMIN') {
       throw new Error('غير مصرح: تعديل بيانات المستخدمين مقتصر على مدير النظام فقط')
@@ -1520,6 +1885,8 @@ export const supabaseDataService = {
       .single()
 
     if (error) throw new Error(`فشل تعديل بيانات المستخدم: ${error.message}`)
+
+    cacheService.invalidateNamespace('users')
 
     await this.recordAuditLog({
       action: 'USER_UPDATE',
@@ -1546,6 +1913,9 @@ export const supabaseDataService = {
   },
 
   async toggleUserStatus(userId: string, isActive: boolean, actor: User): Promise<void> {
+    if (isPrimaryAdmin(userId) && !isActive) {
+      throw new Error('لا يمكن تعطيل أو حذف حساب المدير الأساسي.')
+    }
     const supabase = getSupabaseClient()
     const { error } = await supabase
       .from('authorized_users')

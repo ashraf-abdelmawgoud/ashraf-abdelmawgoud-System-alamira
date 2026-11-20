@@ -175,7 +175,7 @@ export const CompanyProfileForm: React.FC<CompanyProfileFormProps> = ({
           <Button
             type="submit"
             variant="primary"
-            className="bg-[#0F766E] hover:bg-[#115E59] text-white text-xs font-bold px-5"
+            className="bg-[#11243A] hover:bg-[#1E3A5F] text-white text-xs font-bold px-5"
           >
             <span>حفظ إعدادات الهوية</span>
           </Button>
