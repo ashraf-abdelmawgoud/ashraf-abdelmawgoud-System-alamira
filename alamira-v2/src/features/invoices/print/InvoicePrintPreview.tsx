@@ -7,8 +7,6 @@ import { printInvoice, isMobileDevice } from './printInvoice';
 import { exportInvoicePng } from './exportInvoicePng';
 import { dataService } from '@/services/dataService';
 import { useAuth } from '../../../auth/AuthContext';
-import { Share2, Download, X, AlertCircle } from 'lucide-react';
-import { Button } from '../../../components/ui/Button';
 
 interface InvoicePrintPreviewProps {
   invoice: SalesInvoice | null;
@@ -33,11 +31,6 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
   const [zoomMode, setZoomMode] = useState<'fit' | 'actual'>('fit');
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [sheetHeight, setSheetHeight] = useState<number>(1123);
-  const [exportedImage, setExportedImage] = useState<{
-    url: string;
-    fileName: string;
-    blob?: Blob;
-  } | null>(null);
 
   const updateDimensions = useCallback(() => {
     if (containerRef.current) {
@@ -55,11 +48,7 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (exportedImage) {
-          setExportedImage(null);
-        } else {
-          onClose();
-        }
+        onClose();
       }
     };
 
@@ -82,7 +71,7 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
         resizeObserver.disconnect();
       }
     };
-  }, [isOpen, onClose, updateDimensions, exportedImage]);
+  }, [isOpen, onClose, updateDimensions]);
 
   if (!isOpen || !invoice) {
     return null;
@@ -114,53 +103,20 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
     if (!sheetRef.current || isPrinting || isExporting) return;
     setIsExporting(true);
     if (onNotification) {
-      onNotification('جاري تجهيز صورة الفاتورة بدقة عالية...', 'info');
+      onNotification('جاري تجهيز صورة الفاتورة وتنزيلها مباشرة...', 'info');
     }
 
     try {
       const result = await exportInvoicePng(sheetRef.current, invoice.invoice_number);
       if (result.success) {
         dataService.logInvoiceExportPng(invoice.id, invoice.invoice_number, currentUser);
-        if (onNotification) {
-          onNotification(
-            `تم تصدير الفاتورة كصورة PNG بنجاح: ${result.fileName}`,
-            'success'
-          );
-        }
-
-        // On mobile devices, open the preview dialog for easy long-press saving or sharing
-        if (isMobileDevice() && (result.blobUrl || result.dataUrl)) {
-          setExportedImage({
-            url: result.blobUrl || result.dataUrl || '',
-            fileName: result.fileName || `فاتورة_الأميرة_${invoice.invoice_number}.png`,
-            blob: result.blob,
-          });
-        }
       } else {
         if (onNotification) {
-          onNotification(result.error || 'تعذر تجهيز صورة الفاتورة. يرجى المحاولة مرة أخرى.', 'error');
+          onNotification(result.error || 'تعذر تنزيل صورة الفاتورة. يرجى المحاولة مرة أخرى.', 'error');
         }
       }
     } finally {
       setIsExporting(false);
-    }
-  };
-
-  const handleShareExported = async () => {
-    if (!exportedImage || !exportedImage.blob) return;
-    try {
-      const file = new File([exportedImage.blob], exportedImage.fileName, { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: exportedImage.fileName,
-          text: `فاتورة مبيعات رقم ${invoice.invoice_number} - شركة الأميرة للتوريدات والتجارة العامة`,
-        });
-      }
-    } catch (e) {
-      if (e instanceof Error && e.name !== 'AbortError') {
-        console.warn('Share sheet error:', e);
-      }
     }
   };
 
@@ -235,85 +191,6 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
           )}
         </div>
       </div>
-
-      {/* Mobile Interactive Image Save & Share Modal */}
-      {exportedImage && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-black/80 backdrop-blur-sm animate-in fade-in"
-          dir="rtl"
-        >
-          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
-            {/* Header */}
-            <div className="flex items-center justify-between p-3.5 border-b border-slate-100 bg-slate-50">
-              <h3 className="text-sm font-bold text-slate-800">
-                صورة الفاتورة المعتمدة (جاهزة للحفظ)
-              </h3>
-              <button
-                type="button"
-                onClick={() => setExportedImage(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
-                title="إغلاق"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Instruction Tip */}
-            <div className="px-4 py-2 bg-amber-50 border-b border-amber-100 text-amber-800 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
-              <span>
-                💡 نصيحة: يمكنك أيضاً الضغط مطولاً على الصورة لحفظها مباشرة في ألبوم الصور بهاتفك.
-              </span>
-            </div>
-
-            {/* Image Preview Scroll */}
-            <div className="flex-1 overflow-y-auto p-4 bg-slate-100 flex justify-center items-start">
-              <img
-                src={exportedImage.url}
-                alt={exportedImage.fileName}
-                className="max-w-full h-auto rounded-lg shadow-md border border-slate-200 object-contain select-all"
-              />
-            </div>
-
-            {/* Footer Action Buttons */}
-            <div className="p-3.5 border-t border-slate-200 bg-white flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2 flex-1">
-                {typeof navigator !== 'undefined' && 'share' in navigator && (
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="sm"
-                    onClick={handleShareExported}
-                    className="flex-1 bg-[#11243A] hover:bg-[#1E3A5F] text-xs gap-1.5"
-                  >
-                    <Share2 className="w-3.5 h-3.5 text-[#d4af37]" />
-                    <span>مشاركة عبر التطبيقات</span>
-                  </Button>
-                )}
-                <a
-                  href={exportedImage.url}
-                  download={exportedImage.fileName}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold shadow-xs transition-colors flex-1 text-center"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>تنزيل الصورة</span>
-                </a>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setExportedImage(null)}
-                className="text-xs"
-              >
-                إغلاق
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };

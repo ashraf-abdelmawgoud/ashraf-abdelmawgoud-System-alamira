@@ -408,7 +408,7 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(onClose).toHaveBeenCalledTimes(2);
     });
 
-    it('triggers PNG export and notifies on success', async () => {
+    it('triggers PNG export and notifies on start', async () => {
       const onNotification = vi.fn();
       render(
         <InvoicePrintPreview
@@ -424,8 +424,8 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
 
       await waitFor(() => {
         expect(onNotification).toHaveBeenCalledWith(
-          expect.stringContaining('تم تصدير الفاتورة كصورة PNG بنجاح'),
-          'success'
+          expect.stringContaining('جاري تجهيز صورة الفاتورة'),
+          'info'
         );
       });
     });
@@ -732,31 +732,18 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       windowOpenSpy.mockRestore();
     });
 
-    it('E. Mobile PNG Export: Invokes Web Share API when supported on mobile', async () => {
+    it('E. Mobile PNG Export: Directly triggers browser download without Web Share modal', async () => {
       setUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Mobile Safari/537.36');
-
-      const shareMock = vi.fn().mockResolvedValue(undefined);
-      const canShareMock = vi.fn().mockReturnValue(true);
-
-      Object.defineProperty(navigator, 'share', {
-        value: shareMock,
-        configurable: true,
-      });
-      Object.defineProperty(navigator, 'canShare', {
-        value: canShareMock,
-        configurable: true,
-      });
 
       const dummyElement = document.createElement('div');
       dummyElement.className = 'invoice-sheet';
-      dummyElement.innerHTML = '<p>Invoice for Web Share</p>';
+      dummyElement.innerHTML = '<p>Invoice for Direct Mobile Download</p>';
 
-      const result = await exportInvoicePng(dummyElement, 'INV-SHARE-01');
+      const result = await exportInvoicePng(dummyElement, 'INV-DIRECT-01');
 
       expect(result.success).toBe(true);
-      expect(result.method).toBe('share');
-      expect(shareMock).toHaveBeenCalled();
-      expect(shareMock.mock.calls[0][0].title).toContain('فاتورة مبيعات');
+      expect(result.method).toBe('download');
+      expect(result.fileName).toBe('فاتورة_الأميرة_INV-DIRECT-01.png');
     });
 
     it('F. InvoicePrintActions: Displays responsive loading states and prevents double-taps', () => {
@@ -805,14 +792,8 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       expect(exportBtn).toBeDisabled();
     });
 
-    it('G. InvoicePrintPreview: Shows ExportImageModal on mobile after PNG export', async () => {
+    it('G. InvoicePrintPreview: Performs direct one-tap download on mobile without showing any preview modal', async () => {
       setUserAgent('Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 Mobile Safari/537.36');
-
-      // Make canShare return false so it falls back to preview modal
-      Object.defineProperty(navigator, 'canShare', {
-        value: vi.fn().mockReturnValue(false),
-        configurable: true,
-      });
 
       const onNotification = vi.fn();
       render(
@@ -829,19 +810,15 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
 
       await waitFor(() => {
         expect(onNotification).toHaveBeenCalledWith(
-          expect.stringContaining('تم تصدير الفاتورة كصورة PNG بنجاح'),
-          'success'
+          expect.stringContaining('جاري تجهيز صورة الفاتورة'),
+          'info'
         );
       });
 
-      // Verify ExportImageModal appears on mobile
-      await waitFor(() => {
-        expect(screen.getByText('صورة الفاتورة المعتمدة (جاهزة للحفظ)')).toBeInTheDocument();
-        expect(
-          screen.getByText(/يمكنك أيضاً الضغط مطولاً على الصورة لحفظها مباشرة في ألبوم الصور بهاتفك/)
-        ).toBeInTheDocument();
-        expect(screen.getByText('تنزيل الصورة')).toBeInTheDocument();
-      });
+      // Verify that no preview modal or second-tap dialog appeared
+      expect(screen.queryByText('صورة الفاتورة المعتمدة (جاهزة للحفظ)')).not.toBeInTheDocument();
+      expect(screen.queryByText('مشاركة عبر التطبيقات')).not.toBeInTheDocument();
+      expect(screen.queryByText('تنزيل الصورة')).not.toBeInTheDocument();
     });
   });
 });

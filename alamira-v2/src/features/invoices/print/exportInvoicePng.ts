@@ -20,7 +20,7 @@ export interface PngExportResult {
   blob?: Blob;
   blobUrl?: string;
   dataUrl?: string;
-  method?: 'share' | 'download' | 'preview';
+  method?: 'download';
   error?: string;
 }
 
@@ -77,8 +77,7 @@ function convertOklchStringToRgb(str: string | null | undefined): string {
 
 export async function exportInvoicePng(
   element: HTMLElement | null,
-  invoiceNumber: string,
-  options?: PngExportOptions
+  invoiceNumber: string
 ): Promise<PngExportResult> {
   if (!element) {
     return {
@@ -219,57 +218,29 @@ export async function exportInvoicePng(
         : (typeof canvas.toDataURL === 'function' ? canvas.toDataURL('image/png') : '');
 
     // ==========================================
-    // 1. MOBILE NATIVE SHARING (Web Share API with File)
-    // ==========================================
-    if (isMobile && options?.preferShare !== false) {
-      try {
-        const file = new File([blob], fileName, { type: 'image/png' });
-        const canShareFiles =
-          typeof navigator !== 'undefined' &&
-          Boolean(navigator.share) &&
-          Boolean(navigator.canShare && navigator.canShare({ files: [file] }));
-
-        if (canShareFiles) {
-          await navigator.share({
-            files: [file],
-            title: `فاتورة مبيعات (${safeNumber})`,
-            text: `فاتورة مبيعات رقم ${safeNumber} - شركة الأميرة للتوريدات والتجارة العامة`,
-          });
-
-          return {
-            success: true,
-            fileName,
-            blob,
-            blobUrl,
-            method: 'share',
-          };
-        }
-      } catch (shareErr) {
-        // If user cancelled the share sheet (AbortError), that's not a failure
-        if (shareErr instanceof Error && shareErr.name === 'AbortError') {
-          return {
-            success: true,
-            fileName,
-            blob,
-            blobUrl,
-            method: 'preview',
-          };
-        }
-        console.warn('Web Share failed, proceeding to direct Blob download:', shareErr);
-      }
-    }
-
-    // ==========================================
-    // 2. STANDARD / FALLBACK BLOB DOWNLOAD
+    // DIRECT BLOB DOWNLOAD (Desktop & Mobile)
+    // One Tap → Generate PNG → Direct Browser Download
     // ==========================================
     const link = document.createElement('a');
     link.download = fileName;
     link.href = blobUrl;
     link.style.display = 'none';
+    link.setAttribute('download', fileName);
+    link.rel = 'noopener';
     document.body.appendChild(link);
-    link.click();
 
-    // Keep Blob URL alive for 2 minutes to allow mobile downloads to complete
+    try {
+      const clickEvent = new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+      });
+      link.dispatchEvent(clickEvent);
+    } catch {
+      link.click();
+    }
+
+    // Keep Blob URL alive for 2 minutes to allow mobile downloads to complete in background
     setTimeout(() => {
       if (document.body.contains(link)) {
         document.body.removeChild(link);
@@ -284,7 +255,7 @@ export async function exportInvoicePng(
       fileName,
       blob,
       blobUrl,
-      method: isMobile ? 'preview' : 'download',
+      method: 'download',
     };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
