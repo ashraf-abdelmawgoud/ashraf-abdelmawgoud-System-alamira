@@ -1,6 +1,6 @@
 import type { SalesInvoice, Customer } from '../../../types';
 import { round2 } from '../../../domain/invoiceCalculations';
-import { tafqeetArabic } from '../../../lib/tafqeet';
+import { tafqeetArabic } from '@/utils/tafqeet';
 
 export interface InvoicePrintItemModel {
   index: number;
