@@ -31,6 +31,8 @@ vi.mock('html2canvas', () => {
   return {
     default: vi.fn().mockImplementation(() =>
       Promise.resolve({
+        width: 1588,
+        height: 2246,
         toDataURL: () =>
           'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
         toBlob: (callback: (blob: Blob) => void) => {
@@ -852,6 +854,119 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
         expect(result.fileName).toBe('فاتورة_الأميرة_INV-MOBILE-SCALE-01.png');
       } finally {
         document.body.removeChild(wrapper);
+      }
+    });
+
+    it('I. Non-Empty Image & Direct Download Anchor Initiation', async () => {
+      const origCreateElement = document.createElement.bind(document);
+      let createdAnchor: HTMLAnchorElement | null = null;
+      let clickTriggered = false;
+      let dispatchedEvent: Event | null = null;
+
+      const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName: string, options?: ElementCreationOptions) => {
+        const el = origCreateElement(tagName, options);
+        if (tagName.toLowerCase() === 'a') {
+          createdAnchor = el as HTMLAnchorElement;
+          const origDispatch = el.dispatchEvent.bind(el);
+          el.dispatchEvent = vi.fn((event: Event) => {
+            if (event.type === 'click') {
+              clickTriggered = true;
+              dispatchedEvent = event;
+            }
+            try {
+              return origDispatch(event);
+            } catch {
+              // JSDOM navigation error expected
+              return false;
+            }
+          });
+          const origClick = el.click.bind(el);
+          el.click = vi.fn(() => {
+            clickTriggered = true;
+            try {
+              origClick();
+            } catch {
+              // JSDOM navigation error expected
+            }
+          });
+        }
+        return el;
+      });
+
+      const testSheet = document.createElement('div');
+      testSheet.className = 'invoice-sheet';
+      testSheet.innerHTML = '<h2>فاتورة التحقق من سلامة التنزيل المباشر</h2>';
+      document.body.appendChild(testSheet);
+
+      try {
+        const result = await exportInvoicePng(testSheet, 'INV-REGRESSION-NONEMPTY');
+        expect(result.success).toBe(true);
+        expect(result.blob).toBeDefined();
+        expect(result.blob!.size).toBeGreaterThan(0);
+        expect(result.blobUrl).toBeDefined();
+        expect(result.method).toBe('download');
+        expect(result.fileName).toBe('فاتورة_الأميرة_INV-REGRESSION-NONEMPTY.png');
+
+        // Verify anchor was configured for direct download
+        expect(createdAnchor).not.toBeNull();
+        const anchor = createdAnchor as unknown as HTMLAnchorElement;
+        expect(anchor.download).toBe('فاتورة_الأميرة_INV-REGRESSION-NONEMPTY.png');
+        expect(anchor.getAttribute('href')).toMatch(/^blob:/);
+        // Verify anchor is styled off-screen (not display: none)
+        expect(anchor.style.position).toBe('fixed');
+        expect(anchor.style.opacity).toBe('0');
+
+        // Verify click activation was triggered on anchor
+        expect(clickTriggered).toBe(true);
+        expect(dispatchedEvent).not.toBeNull();
+        const evt = dispatchedEvent as unknown as Event;
+        expect(evt.type).toBe('click');
+        expect(evt.bubbles).toBe(true);
+      } finally {
+        document.body.removeChild(testSheet);
+        createElementSpy.mockRestore();
+      }
+    });
+
+    it('J. Regression Guard: Rejects empty or 0-dimension canvas and empty blob', async () => {
+      const html2canvasModule = await import('html2canvas');
+      const origH2C = html2canvasModule.default;
+
+      const testSheet = document.createElement('div');
+      testSheet.className = 'invoice-sheet';
+      testSheet.innerHTML = '<h2>فاتورة اختبار الفشل الآمن</h2>';
+      document.body.appendChild(testSheet);
+
+      try {
+        // 1. Test 0-dimension canvas failure
+        vi.mocked(origH2C).mockImplementationOnce(() =>
+          Promise.resolve({
+            width: 0,
+            height: 0,
+            toDataURL: () => '',
+            toBlob: (cb: (b: Blob | null) => void) => cb(null),
+          } as unknown as HTMLCanvasElement)
+        );
+
+        const resultZeroDim = await exportInvoicePng(testSheet, 'INV-FAIL-ZERO');
+        expect(resultZeroDim.success).toBe(false);
+        expect(resultZeroDim.error).toContain('أبعاد الصورة غير صالحة');
+
+        // 2. Test empty blob failure
+        vi.mocked(origH2C).mockImplementationOnce(() =>
+          Promise.resolve({
+            width: 800,
+            height: 1100,
+            toDataURL: () => '',
+            toBlob: (cb: (b: Blob | null) => void) => cb(new Blob([], { type: 'image/png' })),
+          } as unknown as HTMLCanvasElement)
+        );
+
+        const resultEmptyBlob = await exportInvoicePng(testSheet, 'INV-FAIL-EMPTY');
+        expect(resultEmptyBlob.success).toBe(false);
+        expect(resultEmptyBlob.error).toContain('تعذر إنشاء ملف صورة الفاتورة');
+      } finally {
+        document.body.removeChild(testSheet);
       }
     });
   });

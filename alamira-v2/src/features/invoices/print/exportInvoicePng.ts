@@ -13,6 +13,18 @@
 
 import html2canvas from 'html2canvas';
 
+export interface PngExportMetrics {
+  totalDurationMs: number;
+  fontReadinessMs: number;
+  domPreparationMs: number;
+  html2canvasMs: number;
+  oncloneMs: number;
+  blobConversionMs: number;
+  downloadInitiationMs: number;
+  canvasWidth?: number;
+  canvasHeight?: number;
+}
+
 export interface PngExportResult {
   success: boolean;
   fileName?: string;
@@ -21,6 +33,7 @@ export interface PngExportResult {
   dataUrl?: string;
   method?: 'download';
   error?: string;
+  metrics?: PngExportMetrics;
 }
 
 export interface PngExportOptions {
@@ -78,6 +91,14 @@ export async function exportInvoicePng(
   element: HTMLElement | null,
   invoiceNumber: string
 ): Promise<PngExportResult> {
+  const t0 = performance.now();
+  let fontReadinessMs = 0;
+  let domPreparationMs = 0;
+  let html2canvasMs = 0;
+  let oncloneMs = 0;
+  let blobConversionMs = 0;
+  let downloadInitiationMs = 0;
+
   if (!element) {
     return {
       success: false,
@@ -110,24 +131,30 @@ export async function exportInvoicePng(
   };
 
   try {
-    // Ensure document fonts have completed loading before rasterization (with 1.5s timeout guard)
-    if (document.fonts && document.fonts.ready) {
+    // 1. FAST FONT READINESS: Skip waiting if fonts are already loaded in memory
+    const tFontStart = performance.now();
+    if (document.fonts && document.fonts.status !== 'loaded' && document.fonts.ready) {
       try {
         await Promise.race([
           document.fonts.ready,
-          new Promise((resolve) => setTimeout(resolve, 1500)),
+          new Promise((resolve) => setTimeout(resolve, 800)),
         ]);
       } catch (fontErr) {
         console.warn('Font readiness check skipped or timed out:', fontErr);
       }
     }
+    fontReadinessMs = performance.now() - tFontStart;
 
-    // Intercept computed styles to convert modern CSS oklch() to sRGB for html2canvas
+    // 2. DOM PREPARATION: Wrap live window to protect html2canvas from modern OKLCH colors during DOM cloning
+    const tDomPrepStart = performance.now();
     wrapWindowGCS(window);
+    const renderScale = 2; // Universal 2x retina scale for pixel-perfect clarity
+    domPreparationMs = performance.now() - tDomPrepStart;
 
-    // Universal 2x retina scale for pixel-perfect resolution on both mobile and desktop
-    const renderScale = 2;
-
+    // 3. ROBUST HTML2CANVAS RASTERIZATION:
+    // - Only ignore explicitly flagged toolbar elements (preserves 100% of invoice, fonts, images, and styles)
+    // - imageTimeout 5000ms prevents infinite hangs on slow assets
+    const tH2CStart = performance.now();
     const canvas = await html2canvas(element, {
       scale: renderScale,
       useCORS: true,
@@ -137,32 +164,43 @@ export async function exportInvoicePng(
       windowWidth: 1024,
       scrollX: 0,
       scrollY: 0,
+      imageTimeout: 5000,
+      ignoreElements: (node: Element) => {
+        // Safely ignore print-hidden preview toolbar buttons
+        if (node.classList?.contains('no-print') || node.classList?.contains('invoice-print-modal-actions')) {
+          return true;
+        }
+        return false;
+      },
       onclone: (clonedDoc: Document) => {
+        const tOncloneStart = performance.now();
         if (clonedDoc.defaultView) {
           wrapWindowGCS(clonedDoc.defaultView);
         }
 
         // CRITICAL ROOT-CAUSE REPAIR FOR MOBILE CHROME ANDROID:
-        // On mobile devices, the invoice preview is wrapped in a scaled container (transform: scale(effectiveScale)),
-        // absolute positioning (left: 50%, margin-left: -397px), and constrained wrapper dimensions.
-        // In the cloned document, reset all ancestor containers to static 794px A4 layout so that
-        // html2canvas parses bounds at 794px x naturalHeight instead of scaled/shifted dimensions.
+        // Reset preview modal scaling containers so responsive scale transforms never distort the A4 invoice
         const clonedSheet = clonedDoc.querySelector('.invoice-sheet') as HTMLElement | null;
         if (clonedSheet) {
           let ancestor = clonedSheet.parentElement;
           while (ancestor && ancestor !== clonedDoc.body) {
-            ancestor.style.transform = 'none';
-            ancestor.style.position = 'static';
-            ancestor.style.left = 'auto';
-            ancestor.style.top = 'auto';
-            ancestor.style.margin = '0 auto';
-            ancestor.style.padding = '0';
-            ancestor.style.width = '794px';
-            ancestor.style.minWidth = '794px';
-            ancestor.style.maxWidth = '794px';
-            ancestor.style.height = 'auto';
-            ancestor.style.minHeight = '0';
-            ancestor.style.overflow = 'visible';
+            if (
+              ancestor.classList.contains('invoice-print-modal-inner-scale') ||
+              ancestor.classList.contains('invoice-print-modal-scale-wrapper')
+            ) {
+              ancestor.style.transform = 'none';
+              ancestor.style.position = 'static';
+              ancestor.style.left = 'auto';
+              ancestor.style.top = 'auto';
+              ancestor.style.margin = '0 auto';
+              ancestor.style.padding = '0';
+              ancestor.style.width = '794px';
+              ancestor.style.minWidth = '794px';
+              ancestor.style.maxWidth = '794px';
+              ancestor.style.height = 'auto';
+              ancestor.style.minHeight = '0';
+              ancestor.style.overflow = 'visible';
+            }
             ancestor = ancestor.parentElement;
           }
 
@@ -186,13 +224,25 @@ export async function exportInvoicePng(
         allTextElements.forEach((el) => {
           (el as HTMLElement).style.letterSpacing = 'normal';
         });
+
+        oncloneMs = performance.now() - tOncloneStart;
       },
     });
+    html2canvasMs = performance.now() - tH2CStart;
+
+    // VALIDATION: Ensure canvas was rendered with valid non-zero dimensions
+    if (!canvas || canvas.width === 0 || canvas.height === 0) {
+      return {
+        success: false,
+        error: 'تعذر تصيير صورة الفاتورة (أبعاد الصورة غير صالحة).',
+      };
+    }
 
     const safeNumber = invoiceNumber ? invoiceNumber.replace(/[/\\?%*:|"<>]/g, '-') : 'مبيعات';
     const fileName = `فاتورة_الأميرة_${safeNumber}.png`;
 
-    // Convert canvas to Blob (essential for mobile & Blob URLs)
+    // 4. CANVAS-TO-BLOB CONVERSION
+    const tBlobStart = performance.now();
     let blob: Blob | null = null;
     if (typeof canvas.toBlob === 'function') {
       blob = await new Promise<Blob | null>((resolve) => {
@@ -220,63 +270,43 @@ export async function exportInvoicePng(
         console.warn('Canvas to Blob conversion fallback failed:', convErr);
       }
     }
+    blobConversionMs = performance.now() - tBlobStart;
 
-    if (!blob) {
-      // Fallback to dataUrl if toBlob fails
-      const fallbackDataUrl = typeof canvas.toDataURL === 'function' ? canvas.toDataURL('image/png') : '';
-      if (fallbackDataUrl) {
-        const fallbackLink = document.createElement('a');
-        fallbackLink.download = fileName;
-        fallbackLink.href = fallbackDataUrl;
-        fallbackLink.style.display = 'none';
-        document.body.appendChild(fallbackLink);
-        try {
-          fallbackLink.click();
-        } catch {
-          fallbackLink.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-        }
-        document.body.removeChild(fallbackLink);
-      }
-
+    // VALIDATION: Ensure blob is non-empty before initiating download
+    if (!blob || blob.size === 0) {
       return {
-        success: true,
-        fileName,
-        dataUrl: fallbackDataUrl,
-        method: 'download',
+        success: false,
+        error: 'تعذر إنشاء ملف صورة الفاتورة. يرجى المحاولة مرة أخرى.',
       };
     }
 
-    const blobUrl =
-      typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
-        ? URL.createObjectURL(blob)
-        : (typeof canvas.toDataURL === 'function' ? canvas.toDataURL('image/png') : '');
-
-    // ==========================================
-    // DIRECT BLOB DOWNLOAD (Desktop & Mobile)
+    // 5. DIRECT BLOB DOWNLOAD (Desktop & Mobile)
     // One Tap → Generate PNG → Direct Browser Download
-    // ==========================================
+    const tDownloadStart = performance.now();
+    const blobUrl = URL.createObjectURL(blob);
+
     const link = document.createElement('a');
     link.download = fileName;
     link.href = blobUrl;
-    link.style.display = 'none';
     link.setAttribute('download', fileName);
     link.rel = 'noopener';
+    // Position invisibly in layout tree rather than display: none to guarantee click activation
+    link.style.position = 'fixed';
+    link.style.top = '-9999px';
+    link.style.left = '-9999px';
+    link.style.opacity = '0';
     document.body.appendChild(link);
 
     try {
-      link.click();
+      const clickEvent = new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+      });
+      link.dispatchEvent(clickEvent);
     } catch {
-      try {
-        const clickEvent = new MouseEvent('click', {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-        });
-        link.dispatchEvent(clickEvent);
-      } catch (clickErr) {
-        console.warn('Link click and dispatchEvent both failed:', clickErr);
-      }
+      link.click();
     }
+    downloadInitiationMs = performance.now() - tDownloadStart;
 
     // Keep Blob URL alive for 2 minutes to allow mobile downloads to complete in background
     setTimeout(() => {
@@ -288,12 +318,28 @@ export async function exportInvoicePng(
       }
     }, 120000);
 
+    const totalDurationMs = performance.now() - t0;
+    const metrics: PngExportMetrics = {
+      totalDurationMs: Math.round(totalDurationMs * 10) / 10,
+      fontReadinessMs: Math.round(fontReadinessMs * 10) / 10,
+      domPreparationMs: Math.round(domPreparationMs * 10) / 10,
+      html2canvasMs: Math.round(html2canvasMs * 10) / 10,
+      oncloneMs: Math.round(oncloneMs * 10) / 10,
+      blobConversionMs: Math.round(blobConversionMs * 10) / 10,
+      downloadInitiationMs: Math.round(downloadInitiationMs * 10) / 10,
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+    };
+
+    console.info('[ExportInvoicePng Performance]', JSON.stringify(metrics));
+
     return {
       success: true,
       fileName,
       blob,
       blobUrl,
       method: 'download',
+      metrics,
     };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
@@ -303,7 +349,7 @@ export async function exportInvoicePng(
       error: `فشل تصدير الفاتورة كصورة: ${errorMsg}`,
     };
   } finally {
-    // Restore original window.getComputedStyle to prevent memory leaks and performance drag
+    // Restore original window.getComputedStyle cleanly
     window.getComputedStyle = origWindowGCS;
   }
 }
