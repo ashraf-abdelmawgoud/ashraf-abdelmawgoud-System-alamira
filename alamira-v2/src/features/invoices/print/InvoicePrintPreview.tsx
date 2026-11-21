@@ -1,10 +1,11 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import type { SalesInvoice, Customer } from '../../../types';
 import { mapInvoiceToPrintModel } from './invoicePrintMapper';
 import { InvoicePrintTemplate } from './InvoicePrintTemplate';
 import { InvoicePrintActions } from './InvoicePrintActions';
 import { printInvoice, isMobileDevice } from './printInvoice';
 import { exportInvoicePng } from './exportInvoicePng';
+import type { PngExportInteraction } from './exportInvoicePng';
 import { dataService } from '@/services/dataService';
 import { useAuth } from '../../../auth/AuthContext';
 
@@ -28,9 +29,39 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const exportInFlight = useRef(false);
+  const exportInteraction = useRef<PngExportInteraction | null>(null);
+  const feedbackFrames = useRef(new Set<number>());
   const [zoomMode, setZoomMode] = useState<'fit' | 'actual'>('fit');
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [sheetHeight, setSheetHeight] = useState<number>(1123);
+
+  useLayoutEffect(() => {
+    const interaction = exportInteraction.current;
+    if (!isExporting || !interaction) return;
+    interaction.feedbackCommittedAt = performance.now();
+    // Two frames observe a paint opportunity after commit without delaying export.
+    // This is a scheduling proxy, not confirmation that pixels reached the screen.
+    const firstFrame = requestAnimationFrame(() => {
+      feedbackFrames.current.delete(firstFrame);
+      const secondFrame = requestAnimationFrame(() => {
+        feedbackFrames.current.delete(secondFrame);
+        interaction.feedbackPaintOpportunityAt = performance.now();
+        console.info('[InvoicePng Feedback]', JSON.stringify({
+          tapStartedAt: interaction.tapStartedAt,
+          tapToFeedbackCommitMs: interaction.feedbackCommittedAt! - interaction.tapStartedAt,
+          tapToFeedbackPaintOpportunityMs: interaction.feedbackPaintOpportunityAt - interaction.tapStartedAt,
+        }));
+      });
+      feedbackFrames.current.add(secondFrame);
+    });
+    feedbackFrames.current.add(firstFrame);
+  }, [isExporting]);
+
+  useEffect(() => () => {
+    feedbackFrames.current.forEach(cancelAnimationFrame);
+    feedbackFrames.current.clear();
+  }, []);
 
   const updateDimensions = useCallback(() => {
     if (containerRef.current) {
@@ -100,14 +131,17 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
   };
 
   const handleExportPng = async () => {
-    if (!sheetRef.current || isPrinting || isExporting) return;
+    if (!sheetRef.current || isPrinting || isExporting || exportInFlight.current) return;
+    exportInFlight.current = true;
+    const interaction: PngExportInteraction = { tapStartedAt: performance.now() };
+    exportInteraction.current = interaction;
     setIsExporting(true);
-    if (onNotification) {
-      onNotification('جاري تجهيز صورة الفاتورة وتنزيلها مباشرة...', 'info');
-    }
 
     try {
-      const result = await exportInvoicePng(sheetRef.current, invoice.invoice_number);
+      if (onNotification) {
+        onNotification('جاري تجهيز صورة الفاتورة وتنزيلها مباشرة...', 'info');
+      }
+      const result = await exportInvoicePng(sheetRef.current, invoice.invoice_number, interaction);
       if (result.success) {
         dataService.logInvoiceExportPng(invoice.id, invoice.invoice_number, currentUser);
       } else {
@@ -116,6 +150,7 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
         }
       }
     } finally {
+      exportInFlight.current = false;
       setIsExporting(false);
     }
   };

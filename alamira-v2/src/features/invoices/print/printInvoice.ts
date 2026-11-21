@@ -45,13 +45,13 @@ export function printInvoice(
         .join('\n')
     : '';
 
-  const buildPrintDocumentHtml = (title: string, showToolbar: boolean) => `
+  const buildPrintDocumentHtml = (showToolbar: boolean) => `
     <!DOCTYPE html>
     <html dir="rtl" lang="ar">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${title}</title>
+        <title></title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -167,8 +167,10 @@ export function printInvoice(
 
       if (printWindow) {
         printWindow.document.open();
-        printWindow.document.write(buildPrintDocumentHtml(docTitle, true));
+        printWindow.document.write(buildPrintDocumentHtml(true));
         printWindow.document.close();
+        // Assign untrusted invoice text through the DOM instead of the HTML parser.
+        printWindow.document.title = docTitle;
 
         const triggerMobilePrint = () => {
           try {
@@ -229,8 +231,10 @@ export function printInvoice(
     }
 
     frameDoc.open();
-    frameDoc.write(buildPrintDocumentHtml(docTitle, false));
+    frameDoc.write(buildPrintDocumentHtml(false));
     frameDoc.close();
+    // Keep the iframe path subject to the same text-only title handling.
+    frameDoc.title = docTitle;
 
     const cleanup = () => {
       setTimeout(() => {

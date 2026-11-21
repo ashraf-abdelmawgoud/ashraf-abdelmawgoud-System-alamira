@@ -5,10 +5,9 @@
  *   Retina-quality 2x canvas rasterization and direct file download via Blob URL.
  * 
  * - Mobile Phones & PWAs:
- *   Calibrated 1.5x scale to prevent mobile canvas memory crashes.
+ *   Uses the same 2x canvas scale as desktop.
  *   Uses canvas.toBlob() with real image/png Blobs (avoiding Android Chrome's block on data: URLs).
- *   Integrates Web Share API (navigator.share) with File objects where supported.
- *   Provides full Blob and URL references for interactive mobile preview & long-press save.
+ *   Requests a direct Blob URL download and returns the Blob and URL references.
  */
 
 import html2canvas from 'html2canvas';
@@ -23,6 +22,29 @@ export interface PngExportMetrics {
   downloadInitiationMs: number;
   canvasWidth?: number;
   canvasHeight?: number;
+  tapStartedAt: number;
+  tapToFeedbackCommitMs: number | null;
+  tapToFeedbackPaintOpportunityMs: number | null;
+  tapToDownloadRequestMs: number | null;
+  tapToExportEndMs: number;
+  imageReadinessMs: number | null;
+  imageCount: number;
+  pendingImages: number;
+  failedImages: number;
+  fontWaitOutcome: 'skipped' | 'ready' | 'timeout' | 'error';
+  // Includes library cloning and clone font/image waits before its public hook.
+  beforeOncloneMs: number | null;
+  // Includes parsing, resource waits and rasterization after the public hook.
+  afterOncloneMs: number | null;
+  encodingPath: 'none' | 'toBlob' | 'dataURL-fallback';
+  outcome: 'failure' | 'download-requested';
+  stage: 'target' | 'fonts' | 'preparation' | 'render' | 'encode' | 'download';
+}
+
+export interface PngExportInteraction {
+  tapStartedAt: number;
+  feedbackCommittedAt?: number;
+  feedbackPaintOpportunityAt?: number;
 }
 
 export interface PngExportResult {
@@ -87,9 +109,17 @@ function convertOklchStringToRgb(str: string | null | undefined): string {
   );
 }
 
+// Color-bearing declarations read by html2canvas 1.4.1 while parsing the clone.
+const rendererColorProperties = [
+  'backgroundColor', 'backgroundImage', 'borderTopColor', 'borderRightColor',
+  'borderBottomColor', 'borderLeftColor', 'boxShadow', 'color', 'listStyleImage',
+  'textDecorationColor', 'textShadow', 'webkitTextStrokeColor',
+] as const;
+
 export async function exportInvoicePng(
   element: HTMLElement | null,
-  invoiceNumber: string
+  invoiceNumber: string,
+  interaction?: PngExportInteraction
 ): Promise<PngExportResult> {
   const t0 = performance.now();
   let fontReadinessMs = 0;
@@ -98,20 +128,45 @@ export async function exportInvoicePng(
   let oncloneMs = 0;
   let blobConversionMs = 0;
   let downloadInitiationMs = 0;
-
-  if (!element) {
-    return {
-      success: false,
-      error: 'تعذر العثور على عنصر الفاتورة لتصدير الصورة',
-    };
-  }
+  let stageStartedAt = t0;
+  let cloneEndedAt: number | undefined;
+  const imageListenerCleanup: Array<() => void> = [];
+  const metrics: PngExportMetrics = {
+    totalDurationMs: 0, fontReadinessMs: 0, domPreparationMs: 0,
+    html2canvasMs: 0, oncloneMs: 0, blobConversionMs: 0, downloadInitiationMs: 0,
+    tapStartedAt: interaction?.tapStartedAt ?? t0,
+    tapToFeedbackCommitMs: null, tapToFeedbackPaintOpportunityMs: null,
+    tapToDownloadRequestMs: null, tapToExportEndMs: 0,
+    imageReadinessMs: null, imageCount: 0, pendingImages: 0, failedImages: 0,
+    fontWaitOutcome: 'skipped', beforeOncloneMs: null, afterOncloneMs: null,
+    encodingPath: 'none', outcome: 'failure', stage: 'target',
+  };
 
   const origWindowGCS = window.getComputedStyle;
+  let renderDocument: Document | undefined;
 
   const wrapWindowGCS = (targetWindow: Window) => {
     const orig = targetWindow.getComputedStyle;
     targetWindow.getComputedStyle = function (el: Element, pseudo?: string | null) {
       const style = orig.call(targetWindow, el, pseudo);
+      // Keep ordinary property reads native during the renderer's CSS parsing.
+      // Cloning and pseudo-elements retain generic normalization for copied styles.
+      if (el.ownerDocument === renderDocument && !pseudo) {
+        try {
+          for (const property of rendererColorProperties) {
+            const value = style[property];
+            if (value?.includes('oklch')) {
+              Object.defineProperty(style, property, {
+                configurable: true,
+                value: convertOklchStringToRgb(value),
+              });
+            }
+          }
+          return style;
+        } catch {
+          // Keep the existing proxy path on browsers with non-extensible declarations.
+        }
+      }
       return new Proxy(style, {
         get(target, prop) {
           const val = (target as unknown as Record<string, unknown>)[prop as string];
@@ -131,22 +186,58 @@ export async function exportInvoicePng(
   };
 
   try {
+    if (!element) {
+      return {
+        success: false,
+        metrics,
+        error: 'تعذر العثور على عنصر الفاتورة لتصدير الصورة',
+      };
+    }
+    // Observe existing image loads without introducing an extra readiness wait.
+    const images = Array.from(element.querySelectorAll('img'));
+    metrics.imageCount = images.length;
+    metrics.pendingImages = images.filter((image) => !image.complete).length;
+    metrics.failedImages = images.filter((image) => image.complete && image.naturalWidth === 0).length;
+    if (metrics.pendingImages === 0) metrics.imageReadinessMs = 0;
+    for (const image of images.filter((image) => !image.complete)) {
+      const settled = () => {
+        image.removeEventListener('load', settled);
+        image.removeEventListener('error', settled);
+        metrics.pendingImages--;
+        if (image.naturalWidth === 0) metrics.failedImages++;
+        if (metrics.pendingImages === 0) metrics.imageReadinessMs = performance.now() - t0;
+      };
+      image.addEventListener('load', settled);
+      image.addEventListener('error', settled);
+      imageListenerCleanup.push(() => {
+        image.removeEventListener('load', settled);
+        image.removeEventListener('error', settled);
+      });
+    }
     // 1. FAST FONT READINESS: Skip waiting if fonts are already loaded in memory
     const tFontStart = performance.now();
+    metrics.stage = 'fonts';
+    stageStartedAt = tFontStart;
     if (document.fonts && document.fonts.status !== 'loaded' && document.fonts.ready) {
+      let fontTimer: ReturnType<typeof setTimeout> | undefined;
       try {
-        await Promise.race([
-          document.fonts.ready,
-          new Promise((resolve) => setTimeout(resolve, 800)),
+        metrics.fontWaitOutcome = await Promise.race([
+          document.fonts.ready.then(() => 'ready' as const),
+          new Promise<'timeout'>((resolve) => { fontTimer = setTimeout(() => resolve('timeout'), 800); }),
         ]);
       } catch (fontErr) {
+        metrics.fontWaitOutcome = 'error';
         console.warn('Font readiness check skipped or timed out:', fontErr);
+      } finally {
+        clearTimeout(fontTimer);
       }
     }
     fontReadinessMs = performance.now() - tFontStart;
 
     // 2. DOM PREPARATION: Wrap live window to protect html2canvas from modern OKLCH colors during DOM cloning
     const tDomPrepStart = performance.now();
+    metrics.stage = 'preparation';
+    stageStartedAt = tDomPrepStart;
     wrapWindowGCS(window);
     const renderScale = 2; // Universal 2x retina scale for pixel-perfect clarity
     domPreparationMs = performance.now() - tDomPrepStart;
@@ -155,6 +246,8 @@ export async function exportInvoicePng(
     // - Only ignore explicitly flagged toolbar elements (preserves 100% of invoice, fonts, images, and styles)
     // - imageTimeout 5000ms prevents infinite hangs on slow assets
     const tH2CStart = performance.now();
+    metrics.stage = 'render';
+    stageStartedAt = tH2CStart;
     const canvas = await html2canvas(element, {
       scale: renderScale,
       useCORS: true,
@@ -174,6 +267,8 @@ export async function exportInvoicePng(
       },
       onclone: (clonedDoc: Document) => {
         const tOncloneStart = performance.now();
+        metrics.beforeOncloneMs = tOncloneStart - tH2CStart;
+        if (clonedDoc !== document) renderDocument = clonedDoc;
         if (clonedDoc.defaultView) {
           wrapWindowGCS(clonedDoc.defaultView);
         }
@@ -226,14 +321,19 @@ export async function exportInvoicePng(
         });
 
         oncloneMs = performance.now() - tOncloneStart;
+        cloneEndedAt = performance.now();
       },
     });
     html2canvasMs = performance.now() - tH2CStart;
+    if (cloneEndedAt !== undefined) metrics.afterOncloneMs = performance.now() - cloneEndedAt;
+    metrics.canvasWidth = canvas?.width;
+    metrics.canvasHeight = canvas?.height;
 
     // VALIDATION: Ensure canvas was rendered with valid non-zero dimensions
     if (!canvas || canvas.width === 0 || canvas.height === 0) {
       return {
         success: false,
+        metrics,
         error: 'تعذر تصيير صورة الفاتورة (أبعاد الصورة غير صالحة).',
       };
     }
@@ -243,8 +343,11 @@ export async function exportInvoicePng(
 
     // 4. CANVAS-TO-BLOB CONVERSION
     const tBlobStart = performance.now();
+    metrics.stage = 'encode';
+    stageStartedAt = tBlobStart;
     let blob: Blob | null = null;
     if (typeof canvas.toBlob === 'function') {
+      metrics.encodingPath = 'toBlob';
       blob = await new Promise<Blob | null>((resolve) => {
         canvas.toBlob((b) => resolve(b), 'image/png');
       });
@@ -252,6 +355,7 @@ export async function exportInvoicePng(
 
     // Fallback: convert dataURL to Blob if toBlob is not natively supported
     if (!blob && typeof canvas.toDataURL === 'function') {
+      metrics.encodingPath = 'dataURL-fallback';
       try {
         const dataUrl = canvas.toDataURL('image/png');
         if (typeof window !== 'undefined' && typeof window.atob === 'function') {
@@ -276,6 +380,7 @@ export async function exportInvoicePng(
     if (!blob || blob.size === 0) {
       return {
         success: false,
+        metrics,
         error: 'تعذر إنشاء ملف صورة الفاتورة. يرجى المحاولة مرة أخرى.',
       };
     }
@@ -283,6 +388,8 @@ export async function exportInvoicePng(
     // 5. DIRECT BLOB DOWNLOAD (Desktop & Mobile)
     // One Tap → Generate PNG → Direct Browser Download
     const tDownloadStart = performance.now();
+    metrics.stage = 'download';
+    stageStartedAt = tDownloadStart;
     const blobUrl = URL.createObjectURL(blob);
 
     const link = document.createElement('a');
@@ -307,6 +414,8 @@ export async function exportInvoicePng(
       link.click();
     }
     downloadInitiationMs = performance.now() - tDownloadStart;
+    metrics.tapToDownloadRequestMs = performance.now() - metrics.tapStartedAt;
+    metrics.outcome = 'download-requested';
 
     // Keep Blob URL alive for 2 minutes to allow mobile downloads to complete in background
     setTimeout(() => {
@@ -317,21 +426,6 @@ export async function exportInvoicePng(
         URL.revokeObjectURL(blobUrl);
       }
     }, 120000);
-
-    const totalDurationMs = performance.now() - t0;
-    const metrics: PngExportMetrics = {
-      totalDurationMs: Math.round(totalDurationMs * 10) / 10,
-      fontReadinessMs: Math.round(fontReadinessMs * 10) / 10,
-      domPreparationMs: Math.round(domPreparationMs * 10) / 10,
-      html2canvasMs: Math.round(html2canvasMs * 10) / 10,
-      oncloneMs: Math.round(oncloneMs * 10) / 10,
-      blobConversionMs: Math.round(blobConversionMs * 10) / 10,
-      downloadInitiationMs: Math.round(downloadInitiationMs * 10) / 10,
-      canvasWidth: canvas.width,
-      canvasHeight: canvas.height,
-    };
-
-    console.info('[ExportInvoicePng Performance]', JSON.stringify(metrics));
 
     return {
       success: true,
@@ -346,10 +440,31 @@ export async function exportInvoicePng(
     console.error('Invoice PNG export error:', err);
     return {
       success: false,
+      metrics,
       error: `فشل تصدير الفاتورة كصورة: ${errorMsg}`,
     };
   } finally {
     // Restore original window.getComputedStyle cleanly
     window.getComputedStyle = origWindowGCS;
+    imageListenerCleanup.forEach((removeListeners) => removeListeners());
+    const endedAt = performance.now();
+    // Preserve elapsed time for the stage that threw before its normal end marker.
+    if (metrics.outcome === 'failure') {
+      const elapsed = endedAt - stageStartedAt;
+      if (metrics.stage === 'render') html2canvasMs = elapsed;
+      if (metrics.stage === 'encode') blobConversionMs = elapsed;
+      if (metrics.stage === 'download') downloadInitiationMs = elapsed;
+    }
+    Object.assign(metrics, {
+      totalDurationMs: endedAt - t0,
+      tapToExportEndMs: endedAt - metrics.tapStartedAt,
+      fontReadinessMs, domPreparationMs, html2canvasMs, oncloneMs,
+      blobConversionMs, downloadInitiationMs,
+      tapToFeedbackCommitMs: interaction?.feedbackCommittedAt === undefined
+        ? null : interaction.feedbackCommittedAt - metrics.tapStartedAt,
+      tapToFeedbackPaintOpportunityMs: interaction?.feedbackPaintOpportunityAt === undefined
+        ? null : interaction.feedbackPaintOpportunityAt - metrics.tapStartedAt,
+    });
+    console.info('[ExportInvoicePng Performance]', JSON.stringify(metrics));
   }
 }
