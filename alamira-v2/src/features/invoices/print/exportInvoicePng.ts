@@ -315,10 +315,9 @@ export async function exportInvoicePng(
         }
 
         // Force letter-spacing normal across all cloned elements to preserve Arabic cursive ligatures in html2canvas
-        const allTextElements = clonedDoc.querySelectorAll('.invoice-sheet *');
-        allTextElements.forEach((el) => {
-          (el as HTMLElement).style.letterSpacing = 'normal';
-        });
+        const letterSpacingStyle = clonedDoc.createElement('style');
+        letterSpacingStyle.textContent = '.invoice-sheet, .invoice-sheet * { letter-spacing: normal !important; }';
+        (clonedDoc.head || clonedDoc.body).appendChild(letterSpacingStyle);
 
         oncloneMs = performance.now() - tOncloneStart;
         cloneEndedAt = performance.now();

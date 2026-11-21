@@ -75,6 +75,11 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
+    // Pre-warm Cairo Arabic font while preview is displayed to eliminate font readiness delay upon export tap
+    if (typeof document !== 'undefined' && 'fonts' in document && document.fonts.status !== 'loaded') {
+      document.fonts.load?.('12px Cairo').catch(() => {});
+    }
+
     updateDimensions();
 
     const handleKeyDown = (e: KeyboardEvent) => {
