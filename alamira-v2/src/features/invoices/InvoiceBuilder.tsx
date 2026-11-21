@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import {
   FileText,
   AlertCircle,
@@ -93,6 +93,7 @@ export const InvoiceBuilder: React.FC<InvoiceBuilderProps> = ({
   })
 
   const [loading, setLoading] = useState(false)
+  const saveInFlight = useRef(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   // Active records
@@ -161,6 +162,7 @@ export const InvoiceBuilder: React.FC<InvoiceBuilderProps> = ({
 
   // Submit handler
   const handleSubmit = async (action: 'draft' | 'approve') => {
+    if (saveInFlight.current) return
     setErrorMessage(null)
 
     if (!customerId) {
@@ -215,6 +217,7 @@ export const InvoiceBuilder: React.FC<InvoiceBuilderProps> = ({
       }
     }
 
+    saveInFlight.current = true
     setLoading(true)
     try {
       await onSave({
@@ -239,6 +242,7 @@ export const InvoiceBuilder: React.FC<InvoiceBuilderProps> = ({
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : 'فشل حفظ فاتورة المبيعات')
     } finally {
+      saveInFlight.current = false
       setLoading(false)
     }
   }
