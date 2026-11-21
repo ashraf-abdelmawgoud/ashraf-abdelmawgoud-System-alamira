@@ -16,8 +16,17 @@ import type {
   SalesInvoice,
   Role,
 } from '@/types'
-import { exportToExcel } from '@/lib/excelExport'
 import { round2 } from '@/domain/invoiceCalculations'
+
+let excelModulePromise: Promise<typeof import('@/lib/excelExport')> | undefined
+
+function loadExcelModule() {
+  excelModulePromise ??= import('@/lib/excelExport').catch((error: unknown) => {
+    excelModulePromise = undefined
+    throw new Error('تعذر تحميل أداة تصدير إكسل. تحقق من الاتصال وأعد تحميل الصفحة.', { cause: error })
+  })
+  return excelModulePromise
+}
 
 export type ReportMainCategory =
   | 'overview'
@@ -1028,7 +1037,14 @@ export const reportingService = {
   /**
    * 7. Export helper: Excel XLSX
    */
-  exportToExcel(report: ReportResult) {
+  preloadExcelExport() {
+    void loadExcelModule().catch(() => {
+      // Keep preload failures out of the UI until an export is requested.
+    })
+  },
+
+  async exportToExcel(report: ReportResult) {
+    const { exportToExcel } = await loadExcelModule()
     const today = getCairoDateString(new Date())
     const filename = `AlAmira_${report.category}_${today}`
 

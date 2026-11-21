@@ -1,18 +1,26 @@
+import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/components/layout'
 import {
   DashboardPage,
   ProductsPage,
   CustomersPage,
-  SuppliersPage,
   InvoicesPage,
   InventoryPage,
   ReportsPage,
-  SettingsPage,
-  AuditLogPage,
   NotFoundPage,
 } from '@/pages'
 import { RoleGuard } from '@/auth'
+
+const SuppliersPage = lazy(() => import('@/pages/SuppliersPage').then(m => ({ default: m.SuppliersPage })))
+const SettingsPage = lazy(() => import('@/pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
+const AuditLogPage = lazy(() => import('@/pages/AuditLogPage').then(m => ({ default: m.AuditLogPage })))
+
+const loadingPage = (page: React.ReactNode) => (
+  <Suspense fallback={<div role="status" className="p-6 text-sm text-slate-600">جارٍ تحميل الصفحة...</div>}>
+    {page}
+  </Suspense>
+)
 
 export const router = createBrowserRouter([
   {
@@ -47,7 +55,7 @@ export const router = createBrowserRouter([
             fallbackTitle="صلاحية الموردين غير ممنوحة"
             fallbackMessage="غير مصرح لمسؤول المبيعات بالوصول إلى إدارة الموردين وحساباتهم وفقاً لسياسة الصلاحيات المعتمدة."
           >
-            <SuppliersPage />
+            {loadingPage(<SuppliersPage />)}
           </RoleGuard>
         ),
       },
@@ -87,7 +95,7 @@ export const router = createBrowserRouter([
             fallbackTitle="إعدادات النظام والنسخ الاحتياطي"
             fallbackMessage="هذه الشاشة مخصصة لمدير النظام فقط للتحكم في الإعدادات وإجراء النسخ الاحتياطي."
           >
-            <SettingsPage />
+            {loadingPage(<SettingsPage />)}
           </RoleGuard>
         ),
       },
@@ -99,7 +107,7 @@ export const router = createBrowserRouter([
             fallbackTitle="سجل النشاط والرقابة غير مصرح به"
             fallbackMessage="سجل النشاط والرقابة الإدارية مخصص لمدير النظام (Super Admin) فقط لمراقبة الأمان والعمليات."
           >
-            <AuditLogPage />
+            {loadingPage(<AuditLogPage />)}
           </RoleGuard>
         ),
       },

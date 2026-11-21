@@ -184,6 +184,24 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onNotification }) => {
     fetchReport()
   }, [fetchReport])
 
+  useEffect(() => {
+    if (loading || !reportData?.rows.length) return
+
+    let idleId: number | undefined
+    const timerId = window.setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        idleId = window.requestIdleCallback(() => reportingService.preloadExcelExport(), { timeout: 2000 })
+      } else {
+        reportingService.preloadExcelExport()
+      }
+    }, 1000)
+
+    return () => {
+      window.clearTimeout(timerId)
+      if (idleId !== undefined) window.cancelIdleCallback(idleId)
+    }
+  }, [loading, reportData])
+
   const handleResetFilters = () => {
     setDatePreset('all')
     setDateFrom('')
@@ -191,7 +209,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onNotification }) => {
     setSearchQuery('')
   }
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!reportData || reportData.rows.length === 0) {
       if (onNotification) onNotification('لا توجد بيانات متاحة للتصدير إلى ملف إكسل', 'error')
       return
@@ -199,7 +217,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onNotification }) => {
 
     setIsExportingExcel(true)
     try {
-      const res = reportingService.exportToExcel(reportData)
+      const res = await reportingService.exportToExcel(reportData)
       if (res.success) {
         if (onNotification) {
           onNotification(`تم تصدير التقرير بنجاح إلى ملف إكسل (${res.filename}) بعدد ${res.rowCount} سجل`, 'success')
