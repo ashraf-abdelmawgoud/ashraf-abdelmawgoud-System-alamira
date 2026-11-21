@@ -76,6 +76,15 @@ afterEach(() => {
 });
 
 describe('PNG export diagnostics', () => {
+  it('captures overflowing long-invoice content beyond the A4 sheet box', async () => {
+    const element = sheet();
+    Object.defineProperty(element, 'scrollHeight', { value: 4629 });
+    Object.defineProperty(element, 'offsetHeight', { value: 1123 });
+    const result = await exportInvoicePng(element, 'SYNTHETIC-LONG');
+    expect(result.success).toBe(true);
+    expect(vi.mocked(html2canvas).mock.calls[0][1]).toMatchObject({ height: 4629, scale: 2 });
+  });
+
   it('reports missing-target failures without invoking the renderer', async () => {
     const result = await exportInvoicePng(null, 'SYNTHETIC');
     expect(result.success).toBe(false);

@@ -529,10 +529,14 @@ describe('Phase 3C — Professional Invoice Printing & PNG Export', () => {
       const { container } = render(<InvoicePrintTemplate data={model} />);
 
       // Verify exact name is present
-      expect(screen.getByText('كيبة2*2*10سم')).toBeInTheDocument();
-      expect(
-        screen.getByText('زاوية ألومنيوم 2.5*2.5 سم عالي الجودة (سمك 1.2 مم)')
-      ).toBeInTheDocument();
+      const productNames = Array.from(
+        container.querySelectorAll('.print-table tbody td.text-right > div > bdi'),
+        (element) => element.textContent
+      );
+      expect(productNames).toEqual([
+        'كيبة2*2*10سم',
+        'زاوية ألومنيوم 2.5*2.5 سم عالي الجودة (سمك 1.2 مم)',
+      ]);
 
       // Verify bdi isolation wrapping
       const bdiElements = container.querySelectorAll('tbody td bdi');

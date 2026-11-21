@@ -21,8 +21,15 @@ describe('Phase 14 — Automated Browser Visual Rendering & PDF Inspection', () 
     createdAt: '2026-01-01T00:00:00Z',
   };
 
-  const cssPath = path.resolve(__dirname, '../../dist/assets/index-CW-vyFKV.css');
-  const cssContent = fs.existsSync(cssPath) ? fs.readFileSync(cssPath, 'utf-8') : '';
+  const assetsDir = path.resolve(__dirname, '../../dist/assets');
+  const cssFile = fs.existsSync(assetsDir)
+    ? fs.readdirSync(assetsDir).find((file) => file.endsWith('.css'))
+    : undefined;
+  const cssContent = cssFile ? fs.readFileSync(path.join(assetsDir, cssFile), 'utf-8') : '';
+
+  const logoDataUrl = `data:image/png;base64,${fs.readFileSync(
+    path.resolve(__dirname, '../../public/logo.png')
+  ).toString('base64')}`;
 
   const buildHtml = (bodyHtml: string, title: string) => `
     <!DOCTYPE html>
@@ -50,7 +57,7 @@ describe('Phase 14 — Automated Browser Visual Rendering & PDF Inspection', () 
         </style>
       </head>
       <body>
-        ${bodyHtml}
+        ${bodyHtml.replaceAll('src="/logo.png"', `src="${logoDataUrl}"`)}
       </body>
     </html>
   `;
@@ -139,6 +146,43 @@ describe('Phase 14 — Automated Browser Visual Rendering & PDF Inspection', () 
 
     fs.writeFileSync(htmlFile, buildHtml(container.innerHTML, 'Scenario D - Arabic BiDi Stress Test'), 'utf-8');
     expect(fs.existsSync(htmlFile)).toBe(true);
+
+    for (const count of [12, 40, 80]) {
+      const sourceItems = stressInvoice.items!;
+      const items = Array.from({ length: count }, (_, index) => ({
+        ...sourceItems[index % sourceItems.length],
+        id: `synthetic-item-${index}`,
+        product_sku_snapshot: `SYN-${index + 1}`,
+        quantity: 1,
+        unit_price: 15,
+        discount_value: 0,
+        discount_amount: 0,
+        gross_amount: 15,
+        net_amount: 15,
+      }));
+      const total = count * 15;
+      const longInvoice: SalesInvoice = {
+        ...stressInvoice,
+        id: `synthetic-${count}`,
+        invoice_number: `SYN-${count}`,
+        items,
+        gross_amount: total,
+        item_discounts_amount: 0,
+        subtotal: total,
+        invoice_discount_type: 'none',
+        invoice_discount_value: 0,
+        invoice_discount_amount: 0,
+        additional_charges: 0,
+        final_total: total,
+      };
+      const longView = render(<InvoicePrintTemplate data={mapInvoiceToPrintModel(longInvoice, mockCustomer)} />);
+      fs.writeFileSync(
+        path.join(outDir, `scenario-${count}-invoice.html`),
+        buildHtml(longView.container.innerHTML, `Synthetic ${count}-item invoice`),
+        'utf-8'
+      );
+      longView.unmount();
+    }
 
     const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
     if (fs.existsSync(chromePath)) {

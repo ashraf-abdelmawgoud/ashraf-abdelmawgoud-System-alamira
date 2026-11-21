@@ -240,6 +240,13 @@ export async function exportInvoicePng(
     stageStartedAt = tDomPrepStart;
     wrapWindowGCS(window);
     const renderScale = 2; // Universal 2x retina scale for pixel-perfect clarity
+    // Long invoices can overflow a sheet whose A4 min-height remains its layout height.
+    // html2canvas otherwise crops at the sheet border instead of capturing its content.
+    const captureHeight = Math.ceil(Math.max(
+      element.scrollHeight,
+      element.offsetHeight,
+      element.getBoundingClientRect().height
+    ));
     domPreparationMs = performance.now() - tDomPrepStart;
 
     // 3. ROBUST HTML2CANVAS RASTERIZATION:
@@ -250,6 +257,7 @@ export async function exportInvoicePng(
     stageStartedAt = tH2CStart;
     const canvas = await html2canvas(element, {
       scale: renderScale,
+      ...(captureHeight > 0 ? { height: captureHeight } : {}),
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',

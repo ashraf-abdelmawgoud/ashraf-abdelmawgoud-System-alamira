@@ -1,5 +1,6 @@
 import React from 'react';
 import type { InvoicePrintModel } from './invoicePrintMapper';
+import { InvoiceProductName } from './InvoiceProductName';
 
 interface InvoicePrintItemsProps {
   data: InvoicePrintModel;
@@ -91,7 +92,7 @@ export const InvoicePrintItems: React.FC<InvoicePrintItemsProps> = ({ data }) =>
                   wordBreak: 'normal',
                 }}
               >
-                <bdi dir="auto">{item.name}</bdi>
+                <InvoiceProductName name={item.name} />
               </div>
             </td>
             <td className="border border-[#cbd5e1] px-2 py-2 text-center text-[#334155] whitespace-nowrap">

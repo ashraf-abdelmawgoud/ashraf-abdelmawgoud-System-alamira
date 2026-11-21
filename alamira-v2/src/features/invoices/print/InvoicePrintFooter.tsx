@@ -25,7 +25,7 @@ export const InvoicePrintFooter: React.FC<InvoicePrintFooterProps> = ({ data }) 
       <div className="print-signatures-section flex justify-between gap-3 text-center">
         {/* Customer Signature Box */}
         <div className="print-sign-box flex-1 border border-dashed border-[#94a3b8] rounded-md p-2.5 text-[8.5pt] font-bold text-[#1e293b] bg-[#fafbfc] min-h-[90px] flex flex-col justify-between">
-          <div className="text-[#0a192f] font-extrabold pb-1 border-b border-dashed border-[#cbd5e1] mb-1">
+          <div className="text-[#0a192f] font-extrabold pb-2 border-b border-dashed border-[#cbd5e1] mb-1">
             توقيع المستلم (العميل)
           </div>
           <div className="sign-placeholder flex-1 min-h-[28px]"></div>
@@ -36,7 +36,7 @@ export const InvoicePrintFooter: React.FC<InvoicePrintFooterProps> = ({ data }) 
 
         {/* Accountant / Warehouse Manager Signature Box */}
         <div className="print-sign-box flex-1 border border-dashed border-[#94a3b8] rounded-md p-2.5 text-[8.5pt] font-bold text-[#1e293b] bg-[#fafbfc] min-h-[90px] flex flex-col justify-between">
-          <div className="text-[#0a192f] font-extrabold pb-1 border-b border-dashed border-[#cbd5e1] mb-1">
+          <div className="text-[#0a192f] font-extrabold pb-2 border-b border-dashed border-[#cbd5e1] mb-1">
             المحاسب / مسؤول المخزن
           </div>
           <div className="sign-placeholder flex-1 min-h-[28px]"></div>
@@ -47,7 +47,7 @@ export const InvoicePrintFooter: React.FC<InvoicePrintFooterProps> = ({ data }) 
 
         {/* Management & Company Seal Signature Box */}
         <div className="print-sign-box flex-1 border border-dashed border-[#94a3b8] rounded-md p-2.5 text-[8.5pt] font-bold text-[#1e293b] bg-[#fafbfc] min-h-[90px] flex flex-col justify-between">
-          <div className="text-[#0a192f] font-extrabold pb-1 border-b border-dashed border-[#cbd5e1] mb-1">
+          <div className="text-[#0a192f] font-extrabold pb-2 border-b border-dashed border-[#cbd5e1] mb-1">
             اعتماد الإدارة وختم الشركة
           </div>
           <div className="sign-placeholder flex-1 min-h-[28px]"></div>
