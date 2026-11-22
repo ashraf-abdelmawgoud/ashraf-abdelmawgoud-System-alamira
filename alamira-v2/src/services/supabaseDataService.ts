@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 import { getSupabaseClient } from './supabaseClient'
 import { cacheService } from './cacheService'
 import {
@@ -23,6 +23,7 @@ import {
 } from '@/types'
 import { QENA_TIMEZONE } from '@/lib/formatters'
 import { isPrimaryAdmin } from '@/auth/rbac'
+import { validateInvoiceWrite } from '@/domain/validateInvoiceWrite'
 
 /**
  * Real Supabase Production Data Service Adapter
@@ -45,20 +46,12 @@ export const supabaseDataService = {
       const supabase = getSupabaseClient()
       const isSalesOperator = currentUserRole === 'SALES_OPERATOR'
 
-      // Query products_secure_view (with server-side cost/stock masking) with fallback to products table
-      let { data, error } = await supabase
+      // Query products_secure_view (with server-side cost/stock masking)
+      // A missing secure view is a configuration error, never permission to read the base table.
+      const { data, error } = await supabase
         .from('products_secure_view')
         .select('*')
         .order('name', { ascending: true })
-
-      if (error && (error.code === '42P01' || error.message?.includes('does not exist') || error.message?.includes('relation'))) {
-        const fallback = await supabase
-          .from('products')
-          .select('*, categories(name)')
-          .order('name', { ascending: true })
-        data = fallback.data
-        error = fallback.error
-      }
 
       if (error) {
         throw new Error(`فشل جلب قائمة الأصناف من الخادم: ${error.message}`)
@@ -867,16 +860,19 @@ export const supabaseDataService = {
   },
 
   async createInvoice(data: SalesInvoiceFormData, actor: User): Promise<SalesInvoice> {
+    validateInvoiceWrite(data)
     const supabase = getSupabaseClient()
     if (!data.customer_id) throw new Error('العميل مطلوب لإصدار الفاتورة')
     if (!data.items || data.items.length === 0) throw new Error('يجب إضافة بند صنف واحد على الأقل')
 
     // Fetch customer snapshot
-    const { data: cust } = await supabase
+    const { data: cust, error: customerError } = await supabase
       .from('customers')
       .select('name, phone')
       .eq('id', data.customer_id)
       .single()
+
+    if (customerError || !cust) throw new Error('تعذر التحقق من بيانات العميل؛ لم تُحفظ الفاتورة')
 
     // Generate invoice sequence
     const dateStr = (data.invoice_date || new Date().toISOString().split('T')[0]).replace(/-/g, '')
@@ -907,7 +903,7 @@ export const supabaseDataService = {
       if (!prod) throw new Error(`الصنف ${item.product_id} غير موجود في قاعدة البيانات`)
 
       const qty = Number(item.quantity)
-      const price = Number(item.unit_price || prod.selling_price)
+      const price = Number(item.unit_price ?? prod.selling_price)
       const lineGross = Math.round(qty * price * 100) / 100
       let lineDisc = 0
 
@@ -980,7 +976,10 @@ export const supabaseDataService = {
     }))
 
     const { error: itemsError } = await supabase.from('sales_invoice_items').insert(itemsWithInvId)
-    if (itemsError) throw new Error(`فشل إدراج بنود الفاتورة: ${itemsError.message}`)
+    if (itemsError) {
+      cacheService.invalidateNamespace('invoices')
+      throw new Error(`أُنشئت المسودة ${invoiceNumber} ولكن فشل حفظ بنودها. راجع المسودة قبل إنشاء فاتورة أخرى. ${itemsError.message}`)
+    }
 
     // Invalidate caches
     cacheService.invalidateNamespace('invoices')
@@ -1021,7 +1020,7 @@ export const supabaseDataService = {
     if (existing.status !== 'draft') throw new Error('لا يمكن تعديل فاتورة معتمدة أو ملغاة')
 
     // Ownership check for SALES_OPERATOR
-    if (isSalesOperator && existing.created_by && existing.created_by !== actor.id) {
+    if (isSalesOperator && existing.created_by !== actor.id) {
       await this.recordAuditLog({
         action: 'ACCESS_DENIED',
         category: 'security',
@@ -1038,23 +1037,27 @@ export const supabaseDataService = {
       throw new Error('غير مصرح: يمكن لمسؤول المبيعات تعديل مسودات الفواتير التي أنشأها بنفسه فقط')
     }
 
+    validateInvoiceWrite(data)
+
     // Customer validation
     let cust: Customer | undefined
     if (data.customer_id) {
       const customers = await this.getCustomers()
       cust = customers.find((c) => c.id === data.customer_id)
     }
+    if (!cust) throw new Error('تعذر التحقق من بيانات العميل؛ لم تُحفظ الفاتورة')
 
     // Calculations
-    const allProducts = await this.getProducts(undefined, 'ADMIN')
+    const allProducts = await this.getProducts(undefined, actor.role)
     let grossAmount = 0
     let itemDiscounts = 0
     let subtotal = 0
 
     const itemsToInsert = (data.items || []).map((it) => {
       const prod = allProducts.find((p) => p.id === it.product_id)
-      const qty = Number(it.quantity || 1)
-      const price = Number(it.unit_price || prod?.selling_price || 0)
+      if (!prod) throw new Error(`الصنف ${it.product_id} غير موجود في قاعدة البيانات`)
+      const qty = Number(it.quantity)
+      const price = Number(it.unit_price ?? prod.selling_price)
       const lineGross = Math.round(qty * price * 100) / 100
       let lineDisc = 0
       if (it.discount_type === 'percentage') {
@@ -1093,7 +1096,7 @@ export const supabaseDataService = {
     const finalTotal = Math.max(0, subtotal - invDisc + additional)
 
     // Update header
-    const { error: updateError } = await supabase
+    const { data: updatedHeader, error: updateError } = await supabase
       .from('sales_invoices')
       .update({
         customer_id: data.customer_id || null,
@@ -1113,13 +1116,25 @@ export const supabaseDataService = {
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
+      .eq('status', 'draft')
+      .select('id')
+      .maybeSingle()
 
     if (updateError) throw new Error(`فشل تحديث مسودة الفاتورة: ${updateError.message}`)
+    if (!updatedHeader) throw new Error('لم تُحدّث المسودة: تغيرت حالتها أو صلاحية الوصول إليها. أعد تحميل الفاتورة.')
 
     // Replace items
-    await supabase.from('sales_invoice_items').delete().eq('invoice_id', id)
+    const { error: removeError } = await supabase.from('sales_invoice_items').delete().eq('invoice_id', id)
+    if (removeError) {
+      cacheService.invalidateNamespace('invoices')
+      throw new Error(`توقف حفظ المسودة ${existing.invoice_number}: فشل حذف البنود السابقة. قد تكون بيانات الرأس تغيرت؛ أعد تحميل الفاتورة وراجعها قبل المحاولة مجدداً. ${removeError.message}`)
+    }
     const itemsWithInvId = itemsToInsert.map((it) => ({ ...it, invoice_id: id }))
-    await supabase.from('sales_invoice_items').insert(itemsWithInvId)
+    const { error: insertError } = await supabase.from('sales_invoice_items').insert(itemsWithInvId)
+    if (insertError) {
+      cacheService.invalidateNamespace('invoices')
+      throw new Error(`توقف حفظ المسودة ${existing.invoice_number}: حُذفت البنود السابقة وتعذر حفظ البديلة. أعد تحميل الفاتورة وراجعها قبل المحاولة مجدداً. ${insertError.message}`)
+    }
 
     // Invalidate caches
     cacheService.invalidateNamespace('invoices')
