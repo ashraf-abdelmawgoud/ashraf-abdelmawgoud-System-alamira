@@ -146,6 +146,9 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
       if (onNotification) {
         onNotification('جاري تجهيز صورة الفاتورة وتنزيلها مباشرة...', 'info');
       }
+      if (typeof globalThis !== 'undefined' && 'scheduler' in globalThis && typeof (globalThis as any).scheduler?.yield === 'function') {
+        await (globalThis as any).scheduler.yield();
+      }
       const result = await exportInvoicePng(sheetRef.current, invoice.invoice_number, interaction);
       if (result.success) {
         dataService.logInvoiceExportPng(invoice.id, invoice.invoice_number, currentUser);
