@@ -77,6 +77,17 @@ export function isMockMode(): boolean {
   return !isSupabaseConfigured()
 }
 
+/**
+ * Feature Flag: Determines whether the atomic save_sales_invoice_draft RPC is enabled.
+ * Default is FALSE (disabled) until the database migration is verified in staging/production.
+ */
+export function isAtomicInvoiceRpcEnabled(): boolean {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ENABLE_ATOMIC_INVOICE_RPC === 'true') {
+    return true
+  }
+  return false
+}
+
 let supabaseInstance: SupabaseClient | null = null
 
 /**

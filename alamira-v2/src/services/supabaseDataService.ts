@@ -1,5 +1,5 @@
-﻿/* eslint-disable @typescript-eslint/no-explicit-any */
-import { getSupabaseClient } from './supabaseClient'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { getSupabaseClient, isAtomicInvoiceRpcEnabled } from './supabaseClient'
 import { cacheService } from './cacheService'
 import {
   Product,
@@ -859,7 +859,75 @@ export const supabaseDataService = {
     return all.find((i) => i.id === id) || null
   },
 
+  /**
+   * Atomic RPC Save: Unified draft invoice creation and modification inside a single PostgreSQL transaction.
+   * Active only when VITE_ENABLE_ATOMIC_INVOICE_RPC === 'true'.
+   */
+  async saveInvoiceDraftViaRpc(
+    data: SalesInvoiceFormData,
+    actor: User,
+    existingId?: string,
+    expectedUpdatedAt?: string
+  ): Promise<SalesInvoice> {
+    validateInvoiceWrite(data)
+    const supabase = getSupabaseClient()
+
+    const rpcPayload = {
+      p_invoice_id: existingId || null,
+      p_customer_id: data.customer_id,
+      p_invoice_date: data.invoice_date || new Date().toISOString().split('T')[0],
+      p_invoice_discount_type: data.invoice_discount_type || 'none',
+      p_invoice_discount_value: Number(data.invoice_discount_value || 0),
+      p_additional_charges: Number(data.additional_charges || 0),
+      p_notes: data.notes || null,
+      p_items: (data.items || []).map((it) => ({
+        product_id: it.product_id,
+        quantity: Number(it.quantity),
+        unit_price: it.unit_price !== undefined && it.unit_price !== null ? Number(it.unit_price) : null,
+        discount_type: it.discount_type || 'none',
+        discount_value: Number(it.discount_value || 0),
+      })),
+      p_expected_updated_at: expectedUpdatedAt || null,
+      p_payment_terms: data.payment_terms || null,
+    }
+
+    const { data: result, error: rpcError } = await supabase.rpc('save_sales_invoice_draft', rpcPayload)
+
+    if (rpcError) {
+      if (rpcError.message?.includes('تزامناً') || rpcError.message?.includes('concurrency')) {
+        throw new Error('تم تعديل الفاتورة بواسطة مستخدم آخر تزامناً؛ يرجى إعادة تحميل الفاتورة ومراجعتها')
+      }
+      if (rpcError.message?.includes('غير مصرح')) {
+        throw new Error('غير مصرح: يمكن لمسؤول المبيعات تعديل مسودات الفواتير التي أنشأها بنفسه فقط')
+      }
+      throw new Error(`فشل حفظ مسودة الفاتورة عبر الإجراء الذري: ${rpcError.message}`)
+    }
+
+    if (!result || !result.invoice_id) {
+      throw new Error('فشل حفظ مسودة الفاتورة: لم يُرجع الخادم بيانات صالحة')
+    }
+
+    // Invalidate caches
+    cacheService.invalidateNamespace('invoices')
+    cacheService.invalidateNamespace('dashboard')
+
+    const savedId = result.invoice_id
+
+    // If auto-approve was requested by user form
+    if (data.action === 'approve') {
+      return await this.approveInvoice(savedId, actor)
+    }
+
+    // Return the fresh invoice record
+    const inv = await this.getInvoiceById(savedId)
+    if (!inv) throw new Error('تم حفظ المسودة بنجاح ولكن تعذر قراءة سجلها المحدث')
+    return inv
+  },
+
   async createInvoice(data: SalesInvoiceFormData, actor: User): Promise<SalesInvoice> {
+    if (isAtomicInvoiceRpcEnabled()) {
+      return await this.saveInvoiceDraftViaRpc(data, actor)
+    }
     validateInvoiceWrite(data)
     const supabase = getSupabaseClient()
     if (!data.customer_id) throw new Error('العميل مطلوب لإصدار الفاتورة')
@@ -1011,6 +1079,12 @@ export const supabaseDataService = {
   },
 
   async updateDraftInvoice(id: string, data: SalesInvoiceFormData, actor: User): Promise<SalesInvoice> {
+    if (isAtomicInvoiceRpcEnabled()) {
+      const existing = await this.getInvoiceById(id)
+      if (!existing) throw new Error('مسودة الفاتورة غير موجودة')
+      if (existing.status !== 'draft') throw new Error('لا يمكن تعديل فاتورة معتمدة أو ملغاة')
+      return await this.saveInvoiceDraftViaRpc(data, actor, id, existing.updated_at)
+    }
     const supabase = getSupabaseClient()
     const isSalesOperator = actor.role === 'SALES_OPERATOR'
 

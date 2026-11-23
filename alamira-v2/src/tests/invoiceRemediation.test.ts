@@ -4,7 +4,10 @@ import { cacheService } from '@/services/cacheService'
 import type { Customer, Product, SalesInvoice, SalesInvoiceFormData, User } from '@/types'
 
 const client = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }))
-vi.mock('@/services/supabaseClient', () => ({ getSupabaseClient: () => client }))
+vi.mock('@/services/supabaseClient', () => ({
+  getSupabaseClient: () => client,
+  isAtomicInvoiceRpcEnabled: () => false,
+}))
 
 const admin = { id: 'admin-test', name: 'Test Admin', role: 'ADMIN' } as User
 const sales = { id: 'sales-test', name: 'Test Sales', role: 'SALES_OPERATOR' } as User
